@@ -7,6 +7,7 @@
 <meta property="og:title" content="거미살이">
 <meta property="og:description" content="거미가 되어 자리마다 튼튼한 거미줄을 치는 퍼즐 게임">
 <title>거미살이</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='10' fill='%23fff'/%3E%3Cg fill='none' stroke='%23141416' stroke-width='5' stroke-linecap='round'%3E%3Cpath d='M25 25 13 16M23 31 9 28M23 38 9 41M26 45 15 54M39 25 51 16M41 31 55 28M41 38 55 41M38 45 49 54'/%3E%3C/g%3E%3Cellipse cx='32' cy='35' rx='11' ry='17' fill='%23ffd21a' stroke='%23141416' stroke-width='3'/%3E%3Cpath d='M22 31h20M22 40h20' stroke='%23141416' stroke-width='5'/%3E%3Ccircle cx='32' cy='16' r='7' fill='%23141416'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@500;700&display=swap">
@@ -3339,7 +3340,12 @@ function modeName(){ return mode === 'drag' ? '뼈대실' : '끈끈이실'; }
 function undo(){
   if (phase !== 'build') return;
   if (sp.state === 'cast'){ sp.cast = null; sp.state = 'walk'; return; }
-  if (sp.state === 'spiral'){ endSpiral(); }
+  if (sp.state === 'spiral'){
+    // If no ring segment exists yet, ending the animation must not undo the web built before it.
+    const hasRingSilk = !!(sp.spi && sp.spi.group && sp.spi.group.length);
+    endSpiral();
+    if (!hasRingSilk) return;
+  }
   if (sp.lay){ sp.lay = null; return; }
   if (sp.state === 'hang'){ sp.state = 'walk'; const top = sp.hang.top; sp.hang = null; placeOn(top); return; }
   const e = UNDO.pop(); if (e === undefined) return;
@@ -3531,12 +3537,12 @@ function motesUpdate(dt){
 /* ---------- hints ---------- */
 function ctrlName(k){ return touchUI ? {cast: '날리기', lay: '실', mode: '실 종류', test: '정착하기', undo: '되돌리기'}[k] : {cast: 'F', lay: '스페이스', mode: 'Q', test: '엔터', undo: 'Z'}[k]; }
 // naming a control in a hint also marks it: in the first lessons that button (or key) lights up
-let hintFocus = null;
+let hintFocus = null, hintMoveFocus = false;
 const obj = (k, a, b) => { hintFocus = k; return josa(ctrlName(k), a || '을', b || '를'); };
 function overWater(x){ const w = stageInfo.water; return !!w && x > w[0] && x < w[1]; }
 function layCrossesDrip(){ if (!sp.lay || !drips.length || DEAD[sp.lay.start]) return false; const s = spinneret(); return crossesDrip([[X[sp.lay.start], Y[sp.lay.start]], s]); }
 function hintText(){
-  hintFocus = null;
+  hintFocus = null; hintMoveFocus = false;
   if (phase !== 'build') return '';
   if (sp.state === 'cast') return sp.cast && sp.cast.caught >= 0 ? '걸렸어요. 손을 떼면 묶여요.' : '건너편에 걸릴 때까지 누르고 있어요.';
   if (sp.state === 'hang'){
@@ -3570,8 +3576,14 @@ function hintText(){
   if (tut && stats.drops === 0) return '벌레 동그라미들 바로 위까지 줄을 타고 가서, 아래로 밀고 있으면 실을 달고 내려가요.';
   if (tut && mode !== 'sticky' && hubFar()) return `'가운데'가 벌레 동그라미들에서 멀어요. 동그라미들 사이로 내려가 거기서 세로줄을 치면 '가운데'가 그리로 옮겨가요.`;
   if (tut && stats.lays < 4 && mode !== 'sticky'){
-    if (sp.lay) return '누른 채 걸어가요. 줄이 벌레 동그라미 위를 지나가게 해서, 줄기나 땅에 닿은 데서 손을 떼면 거기까지 줄이 쳐져요.';
-    if (hubLitNow()) return `노란 표시가 커졌어요. 지금 ${obj('lay')} 누른 채 걸어 나가면 '가운데'부터 줄이 생겨요.`;
+    if (sp.lay){
+      if (touchUI){ hintMoveFocus = true; return `한 손으로 ${obj('lay')} 누른 채, 다른 손으로 화면 왼쪽 빈 곳을 밀어 걸어가요. 줄기나 땅에 닿으면 손을 떼세요.`; }
+      return '누른 채 걸어가요. 줄이 벌레 동그라미 위를 지나가게 해서, 줄기나 땅에 닿은 데서 손을 떼면 거기까지 줄이 쳐져요.';
+    }
+    if (hubLitNow()){
+      if (touchUI){ hintMoveFocus = true; return `노란 표시가 커졌어요. 한 손으로 ${obj('lay')} 누른 채, 다른 손으로 화면 왼쪽 빈 곳을 밀어 걸어 나가요.`; }
+      return `노란 표시가 커졌어요. 지금 ${obj('lay')} 누른 채 걸어 나가면 '가운데'부터 줄이 생겨요.`;
+    }
     if (stats.lays === 0) return `실은 거미 배 끝에서 나와요. 배 끝을 '가운데'(노란 점)에 대면 표시가 커져요.`;
     return `세로줄이 ${stats.lays}개예요. 다시 '가운데'로 가서 다른 쪽으로도 쳐 보세요.`;
   }
@@ -3670,13 +3682,14 @@ function onButtonUp(id, inside){
   else if (inside && id !== 'mode') tapButton(id);
 }
 function tapButton(id){
-  if (id === 'test') startTest();
+  if (id === 'test'){ if (phase === 'test') retry(); else startTest(); }
   else if (id === 'undo') undo();
   else if (id === 'reset'){ pickOpen = false; resetStage(); }
   else if (id === 'retry') retry();
   else if (id === 'next') nextStage();
   else if (id === 'restart') loadStage(0);
   else if (id === 'uncleared') toUncleared();
+  else if (id === 'arcade') location.assign('../arcade/');
   else if (id === 'stages'){ pickOpen = !pickOpen; pickSel = stageIdx; }
   else if (id === 'pickClose') pickOpen = false;
   else if (id.startsWith('stage')) pickStage(+id.slice(5));
@@ -3788,13 +3801,17 @@ addEventListener('keydown', e => {
   if (e.repeat){ keys.add(k); return; }
   auInit();
   if (pickOpen){
-    // the stage list is open: up and down choose (the last place is the button that starts this stage again),
+    // the stage list is open: up and down choose the stages, the arcade, and (when available) starting over,
     // Enter takes the chosen one, a number picks one of the first nine stages, Esc closes the list
-    const M = STAGES.length + (canAgain() ? 1 : 0);
+    const M = STAGES.length + 1 + (canAgain() ? 1 : 0);
     if (/^[1-9]$/.test(k) && +k <= STAGES.length) pickStage(+k - 1);
     else if (k === 'arrowdown' || k === 's') pickSel = (pickSel + 1) % M;
     else if (k === 'arrowup' || k === 'w') pickSel = (pickSel + M - 1) % M;
-    else if (k === 'enter'){ if (pickSel >= STAGES.length) tapButton('reset'); else pickStage(pickSel); }
+    else if (k === 'enter'){
+      if (pickSel < STAGES.length) pickStage(pickSel);
+      else if (pickSel === STAGES.length) tapButton('arcade');
+      else tapButton('reset');
+    }
     else if (k === 'escape') pickOpen = false;
     return;
   }
@@ -3806,6 +3823,7 @@ addEventListener('keydown', e => {
   else if (k === 'z' || k === 'backspace') undo();
   else if (k === 'enter'){
     if (phase === 'build') startTest();
+    else if (phase === 'test') retry();
     else if (phase === 'result' && result && !result.pass) retry();
     else if (phase === 'after') nextStage();
     else if (phase === 'end'){ if (cleared.size < STAGES.length) toUncleared(); else loadStage(0); }
@@ -4570,9 +4588,9 @@ function drawUI(){
   // 정착하기 (the bugs come) stands alone at the top right, and 되돌리기 is far from it: on a phone at the top left under the silk,
   // on a computer at the bottom right by the keys. 처음부터 is in the list under the stage name
   const canUndo = UNDO.length > 0 || sp.state !== 'walk' || !!sp.lay;
-  if (phase === 'build'){
-    pill('test', '정착하기', R, T, 'right', true);
-    if (touchUI) undoPill(L, T + 58 * UIS, 'left', canUndo);
+  if (phase === 'build' || phase === 'test'){
+    pill('test', phase === 'test' ? '정착 취소' : '정착하기', R, T, 'right', true);
+    if (phase === 'build' && touchUI) undoPill(L, T + 58 * UIS, 'left', canUndo);
   }
   // on a phone the hint goes below 되돌리기, which is at the top left there. while the name of the game is up, it takes this place
   const y0 = touchUI ? T + 112 * UIS : PM + 100 * UIS, showTitle = titleT < TITLE_END && toastT <= 0;
@@ -4607,7 +4625,7 @@ function drawUI(){
   if (phase === 'end'){
     const left = STAGES.length - cleared.size, w = 280 * UIS, hh = 124 * UIS, x = SW / 2 - w / 2, y = SH / 2 - hh / 2;
     card(x, y, w, hh);
-    text(left ? `아직 못 깬 스테이지가 ${left}개 있어요.` : `스테이지 ${STAGES.length}개를 다 깼어요.`, SW / 2, y + 38 * UIS, 500, 14 * UIS, 'center');
+    text(left ? `아직 못 깬 스테이지가 ${left}개 있어요.` : '떠날 곳이 없어요.', SW / 2, y + 38 * UIS, 500, 14 * UIS, 'center');
     if (left) pill('uncleared', '못 깬 스테이지로', SW / 2, y + 68 * UIS, 'center', true);
     else pill('restart', '처음부터', SW / 2, y + 68 * UIS, 'center', true);
   }
@@ -4620,15 +4638,18 @@ function drawUI(){
       if (!stage.noCast) roundBtn('cast', '날리기', br - 154 * UIS, bb - 50 * UIS, 31 * UIS);
       roundBtn('mode', mode === 'drag' ? '뼈대' : '끈끈이', br - 112 * UIS, bb - 158 * UIS, 29 * UIS, '실 종류', beadN);
       const R0 = stickR();
+      const moveFocus = focus === 'lay' && hintMoveFocus;
       if (stick.id !== null){
         const dx = stick.x - stick.cx, dy = stick.y - stick.cy, d = Math.hypot(dx, dy), k = d > R0 ? R0 / d : 1;
         brush(ellipsePts(stick.cx, stick.cy, R0, R0, 24), UB, 61, true, 0.6);
         const kp = ellipsePts(stick.cx + dx * k, stick.cy + dy * k, 19 * UIS, 19 * UIS, 16);
         ctx.fillStyle = rgbaOf(COL.graphite, 0.12); ctx.fill(polyPath(kp)); brush(kp, UB2, 62, true);
-      } else if (!stickUsed){
+        if (moveFocus) pulseStickGuide(stick.cx, stick.cy);
+      } else if (!stickUsed || moveFocus){
         const gx = PM + 82 * UIS, gyy = SH - PM - 96 * UIS;
-        brush(ellipsePts(gx, gyy, R0, R0, 24), UB, 61, true, 0.3);
-        brush(ellipsePts(gx, gyy, 19 * UIS, 19 * UIS, 16), UB, 62, true, 0.3);
+        brush(ellipsePts(gx, gyy, R0, R0, 24), UB, 61, true, moveFocus ? 0.55 : 0.3);
+        brush(ellipsePts(gx, gyy, 19 * UIS, 19 * UIS, 16), UB, 62, true, moveFocus ? 0.55 : 0.3);
+        if (moveFocus) pulseStickGuide(gx, gyy);
       }
     } else {
       // keys along the bottom; 되돌리기 also as a button in the corner, raised a row if the keys reach that far
@@ -4703,11 +4724,22 @@ function pulseButton(id){
   ring((7 + 14 * k) * UIS, 2.5 * UIS, 0.85 * (1 - k));
 }
 
+function pulseStickGuide(cx, cy){
+  const k = (clock * 1.3) % 1, r = stickR(), br = 0.7 + 0.3 * Math.sin(clock * 6.5);
+  ctx.save();
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = 4 * UIS; ctx.strokeStyle = rgbaOf(COL.yellowDeep, br);
+  ctx.beginPath(); ctx.arc(cx, cy, r + 4 * UIS, 0, TAU); ctx.stroke();
+  ctx.lineWidth = 2.5 * UIS; ctx.strokeStyle = rgbaOf(COL.yellowDeep, 0.85 * (1 - k));
+  ctx.beginPath(); ctx.arc(cx, cy, r + (7 + 14 * k) * UIS, 0, TAU); ctx.stroke();
+  ctx.restore();
+}
+
 function drawStageList(){
   uiButtons.push({id: 'pickClose', x: 0, y: 0, w: SW, h: SH, enabled: true});
   // one row per stage; on a short screen the rows get shorter so all of them fit.
-  // while a stage is being played, the foot of the list has the button that starts it again from nothing
-  const N = STAGES.length, again = canAgain(), head = 50 * UIS, foot = again ? 50 * UIS : 0;
+  // the foot always leads back to the arcade; while playing, it also offers a clean restart
+  const N = STAGES.length, again = canAgain(), head = 50 * UIS, foot = 50 * UIS;
   const rowH = Math.min(42 * UIS, (SH - 2 * PM - 24 - head - foot - 12 * UIS) / N);
   const w = Math.min(320 * UIS, SW - 2 * PM - 20), hh = head + rowH * N + foot + 12 * UIS, x = SW / 2 - w / 2, y = Math.max(PM + 8, SH / 2 - hh / 2);
   const fs = Math.min(15 * UIS, rowH * 0.42);
@@ -4728,15 +4760,23 @@ function drawStageList(){
     if (k < N - 1) brush([[x + 18 * UIS, ry + rowH], [x + w - 18 * UIS, ry + rowH]], BR.fine, 7100 + k, false, 0.3);
     uiButtons.push({id: 'stage' + k, x: x + 6 * UIS, y: ry, w: w - 12 * UIS, h: rowH, enabled: true});
   });
+  const fy = y + head + rowH * N + 4 * UIS, arcadeLabel = '혐규오락실', resetLabel = '이 스테이지 처음부터';
+  brush([[x + 14 * UIS, fy], [x + w - 14 * UIS, fy]], BR.fine, 7199, false, 0.6);
+  const pickGlow = (label, cx, align, selected) => {
+    if (touchUI || !selected) return;
+    ctx.font = `500 ${14 * UIS}px ${FONT}`;
+    const pw = ctx.measureText(label).width + 26 * UIS, x0 = align === 'right' ? cx - pw : align === 'center' ? cx - pw / 2 : cx;
+    ctx.fillStyle = rgbaOf(COL.yellow, 0.45); ctx.fill(polyPath(roundRectPts(x0 - 8 * UIS, fy + 9 * UIS, pw + 16 * UIS, 40 * UIS, 20 * UIS)));
+  };
   if (again){
-    const fy = y + head + rowH * N + 4 * UIS, label = '이 스테이지 처음부터';
-    brush([[x + 14 * UIS, fy], [x + w - 14 * UIS, fy]], BR.fine, 7199, false, 0.6);
-    if (!touchUI && pickSel === N){
-      ctx.font = `500 ${14 * UIS}px ${FONT}`;
-      const pw = ctx.measureText(label).width + 26 * UIS;
-      ctx.fillStyle = rgbaOf(COL.yellow, 0.45); ctx.fill(polyPath(roundRectPts(SW / 2 - pw / 2 - 8 * UIS, fy + 9 * UIS, pw + 16 * UIS, 40 * UIS, 20 * UIS)));
-    }
-    pill('reset', label, SW / 2, fy + 13 * UIS, 'center', false);
+    const ax = x + 18 * UIS, rx = x + w - 18 * UIS;
+    pickGlow(arcadeLabel, ax, 'left', pickSel === N);
+    pickGlow(resetLabel, rx, 'right', pickSel === N + 1);
+    pill('arcade', arcadeLabel, ax, fy + 13 * UIS, 'left', false);
+    pill('reset', resetLabel, rx, fy + 13 * UIS, 'right', false);
+  } else {
+    pickGlow(arcadeLabel, SW / 2, 'center', pickSel === N);
+    pill('arcade', arcadeLabel, SW / 2, fy + 13 * UIS, 'center', false);
   }
 }
 
