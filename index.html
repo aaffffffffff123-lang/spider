@@ -4746,6 +4746,27 @@ function pulseStickGuide(cx, cy){
   ctx.restore();
 }
 
+const ARCADE_FACE_PATH = new Path2D('M24 2.84C27.19 2.93 30.48 3.49 33.44 4.7C36.39 5.91 39.79 7.65 41.72 10.08C43.64 12.51 44.41 16.18 44.97 19.28C45.53 22.39 45.73 25.72 45.08 28.74C44.42 31.76 43.07 35.11 41.06 37.4C39.05 39.69 35.87 41.15 33.03 42.47C30.19 43.79 27.09 45.14 24 45.31C20.91 45.47 17.4 44.72 14.49 43.46C11.58 42.19 8.3 40.21 6.54 37.72C4.78 35.22 4.45 31.57 3.93 28.51C3.41 25.45 2.76 22.23 3.42 19.37C4.08 16.52 6.1 13.9 7.91 11.36C9.72 8.82 11.61 5.56 14.29 4.14C16.97 2.72 20.81 2.75 24 2.84Z');
+const ARCADE_HAIR_PATH = new Path2D('M13.2 8.4V17.9M20.4 6.2V16.6M27.6 6.2V16.6M34.6 8.8V18.3');
+const ARCADE_SMILE_PATH = new Path2D('M19.9 32.3a4.6 4.6 0 0 0 8.2 0');
+function arcadeFaceBtn(cx, cy, selected){
+  if (!touchUI && selected){
+    ctx.fillStyle = rgbaOf(COL.yellow, 0.45); ctx.beginPath(); ctx.arc(cx, cy, 28 * UIS, 0, TAU); ctx.fill();
+  }
+  const pressed = isPressed('arcade'), sc = 38 * UIS / 48 * (pressed ? 0.88 : 1);
+  ctx.save();
+  ctx.translate(cx, cy + (pressed ? 1.5 * UIS : 0)); ctx.scale(sc, sc); ctx.translate(-24, -24);
+  ctx.shadowColor = 'rgba(0,0,0,0.38)'; ctx.shadowBlur = 1.5; ctx.shadowOffsetX = 1; ctx.shadowOffsetY = 2;
+  ctx.fillStyle = '#221d1f'; ctx.fill(ARCADE_FACE_PATH);
+  ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0;
+  ctx.strokeStyle = '#eff1ec'; ctx.lineWidth = 2.2; ctx.lineCap = 'round'; ctx.fillStyle = '#eff1ec';
+  ctx.stroke(ARCADE_HAIR_PATH);
+  ctx.beginPath(); ctx.ellipse(18.1, 25.2, 2, 2.3, 0, 0, TAU); ctx.ellipse(29.9, 25.2, 2, 2.3, 0, 0, TAU); ctx.fill();
+  ctx.lineWidth = 2.3; ctx.stroke(ARCADE_SMILE_PATH);
+  ctx.restore();
+  uiButtons.push({id: 'arcade', circle: true, cx, cy, r: 25 * UIS, enabled: true});
+}
+
 function drawStageList(){
   uiButtons.push({id: 'pickClose', x: 0, y: 0, w: SW, h: SH, enabled: true});
   // one row per stage; on a short screen the rows get shorter so all of them fit.
@@ -4771,10 +4792,10 @@ function drawStageList(){
     if (k < N - 1) brush([[x + 18 * UIS, ry + rowH], [x + w - 18 * UIS, ry + rowH]], BR.fine, 7100 + k, false, 0.3);
     uiButtons.push({id: 'stage' + k, x: x + 6 * UIS, y: ry, w: w - 12 * UIS, h: rowH, enabled: true});
   });
-  const fy = y + head + rowH * N + 4 * UIS, arcadeLabel = '혐규오락실';
+  const fy = y + head + rowH * N + 4 * UIS;
   ctx.font = `500 ${14 * UIS}px ${FONT}`;
-  const fullReset = '이 스테이지 처음부터', fullFootW = ctx.measureText(arcadeLabel).width + ctx.measureText(fullReset).width + 88 * UIS;
-  const resetLabel = fullFootW > w ? '처음부터' : fullReset;
+  const fullReset = '이 스테이지 처음부터', fullResetW = ctx.measureText(fullReset).width + 26 * UIS;
+  const resetLabel = fullResetW > w - 99 * UIS ? '처음부터' : fullReset;
   brush([[x + 14 * UIS, fy], [x + w - 14 * UIS, fy]], BR.fine, 7199, false, 0.6);
   const pickGlow = (label, cx, align, selected) => {
     if (touchUI || !selected) return;
@@ -4783,14 +4804,12 @@ function drawStageList(){
     ctx.fillStyle = rgbaOf(COL.yellow, 0.45); ctx.fill(polyPath(roundRectPts(x0 - 8 * UIS, fy + 9 * UIS, pw + 16 * UIS, 40 * UIS, 20 * UIS)));
   };
   if (again){
-    const ax = x + 18 * UIS, rx = x + w - 18 * UIS;
-    pickGlow(arcadeLabel, ax, 'left', pickSel === N);
+    const ax = x + 43 * UIS, rx = x + w - 18 * UIS;
     pickGlow(resetLabel, rx, 'right', pickSel === N + 1);
-    pill('arcade', arcadeLabel, ax, fy + 13 * UIS, 'left', false);
+    arcadeFaceBtn(ax, fy + 29 * UIS, pickSel === N);
     pill('reset', resetLabel, rx, fy + 13 * UIS, 'right', false);
   } else {
-    pickGlow(arcadeLabel, SW / 2, 'center', pickSel === N);
-    pill('arcade', arcadeLabel, SW / 2, fy + 13 * UIS, 'center', false);
+    arcadeFaceBtn(SW / 2, fy + 29 * UIS, pickSel === N);
   }
 }
 
