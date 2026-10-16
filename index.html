@@ -2347,8 +2347,6 @@ function startSpiral(){
   if (P.fail === 'gap'){ toast('양옆 살이 이 높이까지 안 와서 못 감아요. 가운데 쪽으로 더 들어오세요.'); return; }
   if (P.fail){ toast('세로줄이 더 있어야 끈끈이를 감을 수 있어요.'); return; }
   const hx = X[hub], hy = Y[hub], A0 = P.A[P.si];
-  const first = armNodeAt(A0, P.r, hx, hy);
-  if (first < 0) return;
   // the moves: wind clockwise, (close the ring), walk back to the start, wind the other way
   const steps = [];
   for (let i = 1; i < P.cw.length; i++) steps.push({k: P.cw[i], dir: 1, lay: true});
@@ -2359,11 +2357,13 @@ function startSpiral(){
   }
   sp.state = 'spiral'; sp.lay = null; preview = null;
   const ends = P.closed ? [] : [{k: P.ccw.length ? P.ccw[P.ccw.length - 1] : P.si, dir: -1}, {k: P.cw[P.cw.length - 1], dir: 1}];
-  sp.spi = {hub, A: P.A, r: P.r, steps, i: 0, last: first, lastK: P.si, start: first, nodeAt: {[P.si]: first}, px: X[first], py: Y[first], group: [], ends, ring: ++ringCount};
+  const firstPos = armPointAt(A0, P.r, hx, hy);
+  // The first spoke is split only when the first sticky segment is actually made. Cancelling immediately leaves no hidden physics data behind.
+  sp.spi = {hub, A: P.A, r: P.r, steps, i: 0, last: -1, lastK: P.si, start: -1, nodeAt: {}, px: firstPos[0], py: firstPos[1], group: [], ends, ring: ++ringCount};
 }
 function spiralUpdate(dt){
   const Q = sp.spi;
-  if (DEAD[Q.hub] || DEAD[Q.last] || Q.i >= Q.steps.length){ endSpiral(); return; }
+  if (DEAD[Q.hub] || (Q.last >= 0 && DEAD[Q.last]) || Q.i >= Q.steps.length){ endSpiral(); return; }
   const hx = X[Q.hub], hy = Y[Q.hub], st = Q.steps[Q.i], A = Q.A[st.k];
   armMeasure(A, hx, hy);
   // the next fastening point: where the next spoke crosses this height (a node once it has been made)
@@ -2375,6 +2375,14 @@ function spiralUpdate(dt){
   if (d > 0.5) turnTo(Math.atan2(dy, dx), dt, 9);
   if (d <= v){
     Q.px = T[0]; Q.py = T[1];
+    const from = Q.last >= 0 ? [X[Q.last], Y[Q.last]] : armPointAt(Q.A[Q.lastK], Q.r, hx, hy);
+    const splitSlack = (Q.last < 0 ? 1.6 : 0) + (q0 === undefined && !st.close ? 1.6 : 0);
+    if (st.lay && Math.hypot(T[0] - from[0], T[1] - from[1]) + splitSlack > silkLeft){ flashSilk(); endSpiral(); return; }
+    if (st.lay && Q.last < 0){
+      const first = armNodeAt(Q.A[Q.lastK], Q.r, hx, hy);
+      if (first < 0){ endSpiral(); return; }
+      Q.last = first; Q.start = first; Q.nodeAt[Q.lastK] = first;
+    }
     let q = q0;
     if (q === undefined || DEAD[q]){ q = st.close ? Q.start : armNodeAt(A, Q.r, hx, hy); Q.nodeAt[st.k] = q; }
     if (st.lay && q >= 0 && q !== Q.last){
@@ -2394,8 +2402,8 @@ function endSpiral(){
   const Q = sp.spi;
   if (Q && Q.group && Q.group.length) UNDO.push(Q.group);
   sp.spi = null; sp.state = 'walk'; previewT = 0;
-  if (Q && !DEAD[Q.last] && standable(Q.last) && standBehind(Q)) return;
-  const q = Q && !DEAD[Q.last] && standable(Q.last) ? Q.last : nearestStand(sp.x, sp.y, 30);
+  if (Q && Q.last >= 0 && !DEAD[Q.last] && standable(Q.last) && standBehind(Q)) return;
+  const q = Q && Q.last >= 0 && !DEAD[Q.last] && standable(Q.last) ? Q.last : nearestStand(sp.x, sp.y, 30);
   if (q >= 0) placeOn(q); else relocate();
 }
 function standBehind(Q){
@@ -3366,7 +3374,7 @@ function undo(){
 }
 function takeSnap(){
   return {n: X.length, m: CI.length, X: X.slice(), Y: Y.slice(), Z: Z.slice(), PX: PX.slice(), PY: PY.slice(), PZ: PZ.slice(), CB: CB.slice(), DEAD: DEAD.slice(),
-    snapped: CHAINS.map(c => c.snapped), silk: silkLeft, spc: sp.c, spt: sp.t};
+    snapped: CHAINS.map(c => c.snapped), silk: silkLeft, spc: sp.c, spt: sp.t, sph: sp.h, splm: sp.lastMove.slice()};
 }
 function restoreSnap(s){
   for (const a of [X, Y, Z, PX, PY, PZ, BX, BY, PIN, OBJ, DEAD, FX, FY, INV, KIND, STK, SO, SN, ADJ]) a.length = s.n;
@@ -3376,7 +3384,10 @@ function restoreSnap(s){
   CHAINS.forEach((ch, k) => { ch.snapped = s.snapped[k]; });
   silkLeft = s.silk;
   sp.state = 'walk'; sp.lay = null; sp.cast = null; sp.spi = null; sp.hang = null;
-  sp.c = s.spc; sp.t = s.spt;
+  sp.c = s.spc; sp.t = s.spt; sp.h = s.sph; sp.lastMove = s.splm.slice(); sp.moving = false;
+  if (isWalk(sp.c)){
+    const p = edgePos(); sp.x = p[0]; sp.y = p[1]; sp.z = p[2]; sp.ox = p[0]; sp.oy = p[1]; sp.vx = 0; sp.vy = 0;
+  }
   for (const lg of sp.legs) unplant(lg);
   rebuildHash();
   if (!isWalk(sp.c)) relocate();
@@ -4760,7 +4771,10 @@ function drawStageList(){
     if (k < N - 1) brush([[x + 18 * UIS, ry + rowH], [x + w - 18 * UIS, ry + rowH]], BR.fine, 7100 + k, false, 0.3);
     uiButtons.push({id: 'stage' + k, x: x + 6 * UIS, y: ry, w: w - 12 * UIS, h: rowH, enabled: true});
   });
-  const fy = y + head + rowH * N + 4 * UIS, arcadeLabel = '혐규오락실', resetLabel = '이 스테이지 처음부터';
+  const fy = y + head + rowH * N + 4 * UIS, arcadeLabel = '혐규오락실';
+  ctx.font = `500 ${14 * UIS}px ${FONT}`;
+  const fullReset = '이 스테이지 처음부터', fullFootW = ctx.measureText(arcadeLabel).width + ctx.measureText(fullReset).width + 88 * UIS;
+  const resetLabel = fullFootW > w ? '처음부터' : fullReset;
   brush([[x + 14 * UIS, fy], [x + w - 14 * UIS, fy]], BR.fine, 7199, false, 0.6);
   const pickGlow = (label, cx, align, selected) => {
     if (touchUI || !selected) return;
