@@ -243,6 +243,7 @@ const VW = 540, VH = 900, GROUND = 800, PCX = VW / 2, PCY = 470, FOC = 520;
 let DPR = 1, SW = 1, SH = 1, S = 1, OX = 0, OY = 0, PM = 12, PW = 1, PH = 1, UIS = 1;
 let panelArt = null;
 let touchUI = !!(window.matchMedia && matchMedia('(pointer: coarse)').matches);
+function mobileLandscape(){ return touchUI && SW > SH && S < 0.62; }
 function measure(){
   SW = Math.max(1, cv.clientWidth); SH = Math.max(1, cv.clientHeight);
   DPR = Math.min(2.5, window.devicePixelRatio || 1);
@@ -253,6 +254,7 @@ function measure(){
   OX = PM + (PW - VW * S) / 2; OY = PM + (PH - VH * S) * 0.62;
   UIS = clamp(Math.min(PW, PH * 0.75) / 390, 0.82, 1.25);
   panelArt = buildPanelArt();
+  if (mobileLandscape()) dropAllInput();
 }
 function buildPanelArt(){
   const x0 = PM, y0 = PM, x1 = SW - PM, y1 = SH - PM;
@@ -587,6 +589,7 @@ function trimTop(pts, d){ const top = pts[pts.length - 1]; return pts.filter(p =
 
 const SILK = {drag: {k: 0.92, brk: 1.34, seg: 8}, sticky: {k: 0.32, brk: 2.1, seg: 6}};
 function makeChain(ia, ib, type, restScale, how){
+  const undoMark = {kind: 'web', n: X.length, m: CI.length, k: CHAINS.length, silk: silkLeft, splits: []};
   const T = SILK[type];
   const ax = X[ia], ay = Y[ia], az = Z[ia], bx = X[ib], by = Y[ib], bz = Z[ib];
   const D = Math.hypot(bx - ax, by - ay, bz - az);
@@ -596,11 +599,11 @@ function makeChain(ia, ib, type, restScale, how){
   nodes.push(ib);
   const rest = D / n * restScale, cons = [];
   for (let k = 0; k < n; k++) cons.push(addC(nodes[k], nodes[k + 1], rest, T.k, id, true));
-  const ch = {id, type, how, nodes, cons, restTotal: rest * n, brk: T.brk, snapped: false, dead: false, cost: D, born: clock};
+  const ch = {id, type, how, nodes, cons, restTotal: rest * n, brk: T.brk, snapped: false, dead: false, cost: D, born: clock, undoMark};
   CHAINS.push(ch);
   return ch;
 }
-function splitChain(ch, a, b, t){
+function splitChain(ch, a, b, t, undo){
   // a new node on the thread between neighbours a and b, a fraction t of the way from a
   const ia = ch.nodes.indexOf(a), ib = ch.nodes.indexOf(b);
   if (ia < 0 || ib < 0 || Math.abs(ia - ib) !== 1) return -1;
@@ -614,6 +617,7 @@ function splitChain(ch, a, b, t){
   CJ[c] = P; CR[c] = r * u; ADJ[P].push(c);
   const c2 = addC(P, second, r * (1 - u), CK[c], ch.id, true);
   ch.nodes.splice(lo + 1, 0, P); ch.cons.splice(lo + 1, 0, c2);
+  if (undo) undo.splits.push({ch: ch.id, p: P, c, c2, j: second, r});
   return P;
 }
 
@@ -1698,6 +1702,7 @@ function drawGlints(){
 /* ---------- drips from the eaves: now and then a drop falls from each spot along the edge of the roof, and cuts any thread in its way ---------- */
 let drips = [], dripToast = false, splashes = [];
 function dripsUpdate(dt){
+  if (splashes.length) splashes = splashes.filter(s => clock - s.t0 < 0.3);
   if (!drips.length) return;
   for (const d of drips){
     d.next -= dt;
@@ -1709,7 +1714,6 @@ function dripsUpdate(dt){
     }
     if (d.drops.some(q => q.dead)) d.drops = d.drops.filter(q => !q.dead);
   }
-  if (splashes.length) splashes = splashes.filter(s => clock - s.t0 < 0.3);
 }
 function cutUnder(x, ya, yb){
   // every thread that crosses the drop's path in this step is cut where it crosses
@@ -1752,8 +1756,8 @@ function drawDrops(){
     brush(pts, BR.fine, 1700 + Math.round(q.x), true, 0.8);
   }
   for (const s of splashes){
-    const a = (clock - s.t0) / 0.3, r0 = 2 + a * 5, r1 = r0 + 4;
-    for (const an of [-2.5, -2.0, -1.15, -0.65]) brush([[s.x + Math.cos(an) * r0, s.y + Math.sin(an) * r0], [s.x + Math.cos(an) * r1, s.y + Math.sin(an) * r1]], BR.fine, 1720 + Math.round(an * 10), false, 1 - a, rgbaOf(COL.water, 0.95), rgbaOf(COL.water, 0.6));
+    const a = clamp((clock - s.t0) / 0.3, 0, 1), r0 = 2 + a * 5, r1 = r0 + 4;
+    for (const an of [-2.5, -2.0, -1.15, -0.65]) brush([[s.x + Math.cos(an) * r0, s.y + Math.sin(an) * r0], [s.x + Math.cos(an) * r1, s.y + Math.sin(an) * r1]], BR.fine, 1720 + Math.round(an * 10), false, clamp(1 - a, 0, 1), rgbaOf(COL.water, 0.95), rgbaOf(COL.water, 0.6));
   }
 }
 
@@ -1865,6 +1869,17 @@ function makeSpider(){
   return {state: 'walk', c: -1, t: 0, x: 0, y: 0, z: 0, h: -Math.PI / 2, vx: 0, vy: 0, ox: 0, oy: 0, legs, moving: false, dropT: 0, reachCD: 0, idleT: 0,
     lay: null, cast: null, hang: null, spi: null, reel: null, pose: 0, lastMove: [0, -1], castFails: 0, cheer: 0, hop: 0, hopW: 1, wag: 0};
 }
+function snapLegPose(){
+  const c = Math.cos(sp.h), s = Math.sin(sp.h), bx = sp.x, by = sp.y - sp.hop;
+  for (const lg of sp.legs){
+    lg.hx = bx + c * lg.hip[0] - s * lg.hip[1];
+    lg.hy = by + s * lg.hip[0] + c * lg.hip[1];
+    const rx = lerp(lg.walk[0], lg.idle[0], sp.pose), ry = lerp(lg.walk[1], lg.idle[1], sp.pose);
+    lg.tx = lg.fx = sp.x + c * rx - s * ry;
+    lg.ty = lg.fy = sp.y + s * rx + c * ry;
+    lg.sx = lg.fx; lg.sy = lg.fy;
+  }
+}
 function edgePos(){ const a = CI[sp.c], b = CJ[sp.c], t = sp.t; return [lerp(X[a], X[b], t), lerp(Y[a], Y[b], t), lerp(Z[a], Z[b], t)]; }
 function placeOn(node){
   if (!(node >= 0) || !ADJ[node]) return false;
@@ -1918,7 +1933,7 @@ function nearNode(){
   return best;
 }
 function relocate(){
-  if (sp.spi && sp.spi.group && sp.spi.group.length) UNDO.push(sp.spi.group);
+  if (sp.spi) pushSpiralUndo(sp.spi);
   sp.lay = null; sp.cast = null; sp.spi = null; sp.hang = null;
   let q = nearestStand(sp.x, sp.y, 120);
   if (q < 0) q = stageInfo.start;
@@ -2272,7 +2287,7 @@ function armPointAt(A, r, hx, hy){
   }
   return [X[prev], Y[prev]];
 }
-function armNodeAt(A, r, hx, hy){
+function armNodeAt(A, r, hx, hy, undo){
   const n = A.nodes;
   let prev = n[0], prevD = Math.hypot(X[prev] - hx, Y[prev] - hy);
   for (let k = 1; k < n.length; k++){
@@ -2281,7 +2296,7 @@ function armNodeAt(A, r, hx, hy){
       const t = clamp((r - prevD) / (d - prevD), 0, 1), L = Math.hypot(X[q] - X[prev], Y[q] - Y[prev]);
       if (t * L < 1.6) return prev;
       if ((1 - t) * L < 1.6) return q;
-      const P = splitChain(A.ch, prev, q, t);
+      const P = splitChain(A.ch, prev, q, t, undo);
       if (P < 0) return t < 0.5 ? prev : q;
       n.splice(k, 0, P);
       return P;
@@ -2359,7 +2374,8 @@ function startSpiral(){
   const ends = P.closed ? [] : [{k: P.ccw.length ? P.ccw[P.ccw.length - 1] : P.si, dir: -1}, {k: P.cw[P.cw.length - 1], dir: 1}];
   const firstPos = armPointAt(A0, P.r, hx, hy);
   // The first spoke is split only when the first sticky segment is actually made. Cancelling immediately leaves no hidden physics data behind.
-  sp.spi = {hub, A: P.A, r: P.r, steps, i: 0, last: -1, lastK: P.si, start: -1, nodeAt: {}, px: firstPos[0], py: firstPos[1], group: [], ends, ring: ++ringCount};
+  sp.spi = {hub, A: P.A, r: P.r, steps, i: 0, last: -1, lastK: P.si, start: -1, nodeAt: {}, px: firstPos[0], py: firstPos[1], group: [],
+    undo: {kind: 'web', n: X.length, m: CI.length, k: CHAINS.length, silk: silkLeft, splits: []}, ends, ring: ++ringCount};
 }
 function spiralUpdate(dt){
   const Q = sp.spi;
@@ -2379,12 +2395,12 @@ function spiralUpdate(dt){
     const splitSlack = (Q.last < 0 ? 1.6 : 0) + (q0 === undefined && !st.close ? 1.6 : 0);
     if (st.lay && Math.hypot(T[0] - from[0], T[1] - from[1]) + splitSlack > silkLeft){ flashSilk(); endSpiral(); return; }
     if (st.lay && Q.last < 0){
-      const first = armNodeAt(Q.A[Q.lastK], Q.r, hx, hy);
+      const first = armNodeAt(Q.A[Q.lastK], Q.r, hx, hy, Q.undo);
       if (first < 0){ endSpiral(); return; }
       Q.last = first; Q.start = first; Q.nodeAt[Q.lastK] = first;
     }
     let q = q0;
-    if (q === undefined || DEAD[q]){ q = st.close ? Q.start : armNodeAt(A, Q.r, hx, hy); Q.nodeAt[st.k] = q; }
+    if (q === undefined || DEAD[q]){ q = st.close ? Q.start : armNodeAt(A, Q.r, hx, hy, Q.undo); Q.nodeAt[st.k] = q; }
     if (st.lay && q >= 0 && q !== Q.last){
       const gap = Math.hypot(X[q] - X[Q.last], Y[q] - Y[Q.last]);
       if (gap > silkLeft){ flashSilk(); endSpiral(); return; }
@@ -2400,11 +2416,15 @@ function spiralUpdate(dt){
 }
 function endSpiral(){
   const Q = sp.spi;
-  if (Q && Q.group && Q.group.length) UNDO.push(Q.group);
+  if (Q) pushSpiralUndo(Q);
   sp.spi = null; sp.state = 'walk'; previewT = 0;
   if (Q && Q.last >= 0 && !DEAD[Q.last] && standable(Q.last) && standBehind(Q)) return;
   const q = Q && Q.last >= 0 && !DEAD[Q.last] && standable(Q.last) ? Q.last : nearestStand(sp.x, sp.y, 30);
   if (q >= 0) placeOn(q); else relocate();
+}
+function pushSpiralUndo(Q){
+  if (!Q || !Q.undo || (!Q.group.length && !Q.undo.splits.length)) return;
+  UNDO.push({...Q.undo, ids: Q.group.slice(), splits: Q.undo.splits.slice()});
 }
 function standBehind(Q){
   // stand on the spoke where the ring ended, facing along it, with the spinnerets on the ring's last fastening point
@@ -3321,7 +3341,9 @@ function titleUpdate(dt){
 let stats = {bridges: 0, drops: 0, lays: 0, sticky: 0, crossed: false};
 let snap = null, result = null;
 function spend(ch, group){
-  silkLeft -= ch.cost; if (group) group.push(ch.id); else UNDO.push(ch.id);
+  silkLeft -= ch.cost;
+  if (group) group.push(ch.id);
+  else UNDO.push({...ch.undoMark, ids: [ch.id]});
   if (ch.type === 'drag') hubT = 0;   // a new frame thread can move the centre: show it at once
   pluck(clamp(5200 / Math.max(ch.cost, 6), 260, 1500), ch.type === 'sticky' ? 0.07 : 0.15, panOf(X[ch.nodes[ch.nodes.length - 1]]));
   refreshStats();
@@ -3349,28 +3371,53 @@ function undo(){
   if (phase !== 'build') return;
   if (sp.state === 'cast'){ sp.cast = null; sp.state = 'walk'; return; }
   if (sp.state === 'spiral'){
-    // If no ring segment exists yet, ending the animation must not undo the web built before it.
-    const hasRingSilk = !!(sp.spi && sp.spi.group && sp.spi.group.length);
+    // If no ring segment or fastening split exists yet, ending the animation must not undo the web built before it.
+    const hasRingWork = !!(sp.spi && ((sp.spi.group && sp.spi.group.length) || (sp.spi.undo && sp.spi.undo.splits.length)));
     endSpiral();
-    if (!hasRingSilk) return;
+    if (!hasRingWork) return;
   }
   if (sp.lay){ sp.lay = null; return; }
   if (sp.state === 'hang'){ sp.state = 'walk'; const top = sp.hang.top; sp.hang = null; placeOn(top); return; }
   const e = UNDO.pop(); if (e === undefined) return;
   if (e.back){ putBackStage(e.back); pluck(520, 0.08); toast('아까 친 거미줄로 돌아왔어요.', 2.4); return; }
-  const ids = Array.isArray(e) ? e : [e];
+  const ids = e && e.kind === 'web' ? e.ids : Array.isArray(e) ? e : [e];
   for (let m = ids.length - 1; m >= 0; m--){
-    const ch = CHAINS[ids[m]]; if (ch.dead) continue;
+    const ch = CHAINS[ids[m]]; if (!ch || ch.dead) continue;
     ch.dead = true;
     for (const c of ch.cons) CB[c] = 1;
     for (let k = 1; k < ch.nodes.length - 1; k++) DEAD[ch.nodes[k]] = 1;
     silkLeft += ch.cost;
   }
+  if (e && e.kind === 'web' && canTruncateUndo(e)) truncateUndo(e);
   previewT = 0; hubT = 0;
   refreshStats();
   rebuildHash();
-  if (!isWalk(sp.c)) relocate();
+  hubNode = mainHub();
+  if (!isWalk(sp.c) || (e && e.splits && e.splits.length)) relocate();
+  for (const lg of sp.legs) unplant(lg);
+  snapLegPose();
   pluck(520, 0.08);
+}
+function canTruncateUndo(e){
+  if (!(e.n >= 0 && e.m >= 0 && e.k >= 0) || e.n > X.length || e.m > CI.length || e.k > CHAINS.length) return false;
+  const ids = new Set(e.ids || []), tail = CHAINS.slice(e.k);
+  return tail.length === ids.size && tail.every(ch => ids.has(ch.id));
+}
+function truncateUndo(e){
+  for (let k = e.splits.length - 1; k >= 0; k--){
+    const q = e.splits[k], ch = CHAINS[q.ch]; if (!ch) continue;
+    const broken = !!(CB[q.c] || CB[q.c2]);
+    const ni = ch.nodes.indexOf(q.p); if (ni >= 0) ch.nodes.splice(ni, 1);
+    const ci = ch.cons.indexOf(q.c2); if (ci >= 0) ch.cons.splice(ci, 1);
+    CJ[q.c] = q.j; CR[q.c] = q.r; CB[q.c] = broken ? 1 : 0;
+  }
+  for (const a of [X, Y, Z, PX, PY, PZ, BX, BY, PIN, OBJ, DEAD, FX, FY, INV, KIND, STK, SO, SN, ADJ]) a.length = e.n;
+  for (const a of [CI, CJ, CR, CB, CK, CCH, CW]) a.length = e.m;
+  CHAINS.length = e.k; SX.length = e.n; SY.length = e.n;
+  for (let i = 0; i < ADJ.length; i++) ADJ[i] = [];
+  for (let c = 0; c < CI.length; c++) if (CW[c] && ADJ[CI[c]] && ADJ[CJ[c]]){ ADJ[CI[c]].push(c); ADJ[CJ[c]].push(c); }
+  silkLeft = e.silk;
+  preview = null; heavySeen = []; laneHot = []; laneT = 0; snapShow = -1; glints = glints.filter(g => g.p < e.n);
 }
 function takeSnap(){
   return {n: X.length, m: CI.length, X: X.slice(), Y: Y.slice(), Z: Z.slice(), PX: PX.slice(), PY: PY.slice(), PZ: PZ.slice(), CB: CB.slice(), DEAD: DEAD.slice(),
@@ -3402,12 +3449,12 @@ function settleSpider(){
 /* 처음부터 can be taken back: the stage as it stood is kept whole (loading a stage makes all of these anew), and 되돌리기 puts it back */
 function keepStage(){
   return {X, Y, Z, PX, PY, PZ, BX, BY, PIN, OBJ, DEAD, FX, FY, INV, KIND, STK, SO, SN, ADJ, CI, CJ, CR, CB, CK, CCH, CW, CHAINS, UNDO,
-    stageInfo, worldArt, objBase, objShake, objSway, hiddenObj, peelT, peelToast, laneHot, heavySeen, drips, dripToast,
+    stageInfo, worldArt, objBase, objShake, objSway, hiddenObj, peelT, peelToast, laneHot, heavySeen, drips, dripToast, splashes,
     gustBoost, stormK, stageTries, buildT, silkLeft, mode, stats, sp, hubNode};
 }
 function putBackStage(k){
   ({X, Y, Z, PX, PY, PZ, BX, BY, PIN, OBJ, DEAD, FX, FY, INV, KIND, STK, SO, SN, ADJ, CI, CJ, CR, CB, CK, CCH, CW, CHAINS, UNDO,
-    stageInfo, worldArt, objBase, objShake, objSway, hiddenObj, peelT, peelToast, laneHot, heavySeen, drips, dripToast,
+    stageInfo, worldArt, objBase, objShake, objSway, hiddenObj, peelT, peelToast, laneHot, heavySeen, drips, dripToast, splashes,
     gustBoost, stormK, stageTries, buildT, silkLeft, mode, stats, sp, hubNode} = k);
   preview = null; previewT = 0; hubT = 0.25; laneT = 0; snapShow = -1; silkFlash = 0;
   prevIn.lay = false; prevIn.cast = false; held.lay = false; held.cast = false; latch.lay = false; latch.cast = false;
@@ -3460,6 +3507,7 @@ function preLine(a, b, how, restScale){
 }
 function chainNodeNear(ch, x, y){ let b = -1, bd = 1e9; for (const n of ch.nodes){ const d = Math.hypot(X[n] - x, Y[n] - y); if (d < bd){ bd = d; b = n; } } return b; }
 function loadStage(i){
+  resetGameplayInput();
   if (bugs.length) stopBuzzes();
   titleT = 99; titleIntro = null;
   stageIdx = i; stage = STAGES[i];
@@ -3468,7 +3516,7 @@ function loadStage(i){
   stageInfo = stage.build(); worldArt = stageInfo.art; objBase = stageInfo.objs;
   objShake = objBase.map(() => ({amp: 0, t0: -9, ax: 1, ay: 0}));
   objSway = stageInfo.sway || []; hiddenObj = []; gustBoost = 0; stormK = 0; stageTries = 0; buildT = 0; peelT = []; peelToast = false; laneHot = []; laneT = 0; heavySeen = []; pickOpen = false;
-  drips = stageInfo.drips ? stageInfo.drips.map(d => ({...d, drops: [], next: d.ph})) : []; dripToast = false;
+  drips = stageInfo.drips ? stageInfo.drips.map(d => ({...d, drops: [], next: d.ph})) : []; dripToast = false; splashes = [];
   if (USE_SAVE) try { localStorage.setItem(AT_KEY, stage.id); } catch (e) {}
   silkLeft = stage.budget; mode = 'drag'; preview = null; previewT = 0; hubNode = -1; hubT = 0; silkFlash = 0;
   phase = 'build'; phaseT = 0; bugs = []; result = null; snap = null; testBroken = 0; dz = null; shadowT0 = -9; impacts = []; toastT = 0;
@@ -3487,6 +3535,7 @@ function loadStage(i){
   rebuildHash();
   sp = makeSpider(); placeOn(stageInfo.start); sp.h = stageInfo.face !== undefined ? stageInfo.face : -Math.PI / 2;
   if (stageInfo.startT !== undefined && isWalk(sp.c)){ sp.t = stageInfo.startT; const p = edgePos(); sp.x = p[0]; sp.y = p[1]; }
+  snapLegPose();
   initMotes();
   if (stage.intro) toast(stage.intro, 4);
 }
@@ -3507,8 +3556,12 @@ function evaluate(){
   pluck(196, 0.24);
   for (const b of bugs) if (b.state === 'stuck') buzzSet(b.voice, 0, 0);
 }
-function retry(){ stopBuzzes(); bugs = []; if (snap) restoreSnap(snap); snap = null; result = null; phase = 'build'; phaseT = 0; }
-function nextStage(){ if (stageIdx + 1 < STAGES.length) loadStage(stageIdx + 1); else { phase = 'end'; phaseT = 0; } }
+function retry(){ resetGameplayInput(); stopBuzzes(); bugs = []; if (snap) restoreSnap(snap); snap = null; result = null; phase = 'build'; phaseT = 0; }
+function nextStage(){
+  if (cleared.size >= STAGES.length){ phase = 'end'; phaseT = 0; return; }
+  const k = STAGES.findIndex((s, i) => i > stageIdx && !cleared.has(s.id));
+  loadStage(k >= 0 ? k : firstUncleared());
+}
 function toUncleared(){ const k = firstUncleared(); loadStage(k >= 0 ? k : 0); }
 function flowUpdate(){
   if (phase === 'test'){
@@ -3695,21 +3748,26 @@ function onButtonUp(id, inside){
 function tapButton(id){
   if (id === 'test'){ if (phase === 'test') retry(); else startTest(); }
   else if (id === 'undo') undo();
-  else if (id === 'reset'){ pickOpen = false; resetStage(); }
+  else if (id === 'reset'){ setPicker(false); resetStage(); }
   else if (id === 'retry') retry();
   else if (id === 'next') nextStage();
   else if (id === 'restart') loadStage(0);
   else if (id === 'uncleared') toUncleared();
   else if (id === 'arcade') location.assign('../arcade/');
-  else if (id === 'stages'){ pickOpen = !pickOpen; pickSel = stageIdx; }
-  else if (id === 'pickClose') pickOpen = false;
+  else if (id === 'stages') setPicker(!pickOpen);
+  else if (id === 'pickClose') setPicker(false);
   else if (id.startsWith('stage')) pickStage(+id.slice(5));
 }
 function canAgain(){ return phase === 'build' || phase === 'result'; }
 function pickStage(k){
   // the stage being played: the list only closes (starting it again is the button at the foot of the list)
-  if (k === stageIdx && canAgain()) pickOpen = false;
+  if (k === stageIdx && canAgain()) setPicker(false);
   else loadStage(k);
+}
+function setPicker(open){
+  pickOpen = !!open;
+  if (pickOpen) pickSel = stageIdx;
+  dropAllInput();
 }
 /* touch: every finger is tracked, and the list the browser reports on each touch event is the truth.
    a finger whose lift was never reported can't leave the stick or a held button stuck: the next touch event drops it */
@@ -3741,9 +3799,12 @@ function syncTouches(list, cancel){
 }
 cv.addEventListener('touchstart', e => {
   e.preventDefault();
-  if (AU.ctx) auInit();   // the first time, sound is started when the finger lifts (browsers only allow it then)
+  const switched = !touchUI;
   touchUI = true;
-  syncTouches(e.touches);
+  if (switched) render();
+  auInit();
+  if (mobileLandscape()){ dropAllInput(); return; }
+  syncTouches(e.touches, true);
   for (const t of e.changedTouches){
     const [x, y] = touchXY(t), b = hitButton(x, y);
     if (b){ touches.set(t.identifier, {role: 'btn', btn: b.id, x, y, inside: true}); onButtonDown(b.id); }
@@ -3764,7 +3825,7 @@ function touchEnd(e){
   e.preventDefault();
   for (const t of e.changedTouches){ const T = touches.get(t.identifier); if (T && T.role === 'btn'){ const [x, y] = touchXY(t); T.inside = onButton(x, y, T.btn); } }
   syncTouches(e.touches, e.type === 'touchcancel');
-  auInit();   // a finger lifting is what lets a phone browser start sound
+  auInit();   // fallback for browsers that did not resume audio on touchstart
 }
 cv.addEventListener('touchend', touchEnd, {passive: false});
 cv.addEventListener('touchcancel', touchEnd, {passive: false});
@@ -3773,7 +3834,8 @@ cv.addEventListener('pointerdown', e => {
   if (e.pointerType === 'touch') return;
   auInit();
   const [x, y] = localXY(e);
-  if (e.pointerType === 'pen') touchUI = true;
+  if (e.pointerType === 'pen' && !touchUI){ touchUI = true; render(); }
+  if (mobileLandscape()){ dropAllInput(); e.preventDefault(); return; }
   const b = hitButton(x, y);
   if (b){ ptrs.set(e.pointerId, {role: 'btn', id: b.id, inside: true}); onButtonDown(b.id); }
   else if (touchUI && canStick(y) && stick.id === null){ ptrs.set(e.pointerId, {role: 'stick'}); grabStick('p' + e.pointerId, x, y); }
@@ -3798,7 +3860,12 @@ function endPtr(e){
 cv.addEventListener('pointerup', endPtr);
 cv.addEventListener('pointercancel', endPtr);
 cv.addEventListener('lostpointercapture', endPtr);
-function dropAllInput(){ keys.clear(); held.lay = false; held.cast = false; latch.lay = false; latch.cast = false; stick.id = null; ptrs.clear(); touches.clear(); }
+function dropAllInput(){ keys.clear(); held.lay = false; held.cast = false; latch.lay = false; latch.cast = false; keyHoldT = 0; stick.id = null; ptrs.clear(); touches.clear(); }
+function resetGameplayInput(){
+  dropAllInput();
+  inp.x = 0; inp.y = 0; inp.mag = 0; inp.lay = false; inp.cast = false;
+  prevIn.lay = false; prevIn.cast = false;
+}
 addEventListener('blur', dropAllInput);
 document.addEventListener('visibilitychange', () => {
   // hidden: the game stops, and so does its sound
@@ -3809,7 +3876,6 @@ cv.addEventListener('contextmenu', e => e.preventDefault());
 addEventListener('keydown', e => {
   const k = e.key.toLowerCase();
   if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' ', 'tab'].includes(k)) e.preventDefault();
-  if (e.repeat){ keys.add(k); return; }
   auInit();
   if (pickOpen){
     // the stage list is open: up and down choose the stages, the arcade, and (when available) starting over,
@@ -3823,10 +3889,11 @@ addEventListener('keydown', e => {
       else if (pickSel === STAGES.length) tapButton('arcade');
       else tapButton('reset');
     }
-    else if (k === 'escape') pickOpen = false;
+    else if (k === 'escape') setPicker(false);
     return;
   }
-  if (k === 'escape' && (phase === 'build' || phase === 'result' || phase === 'after' || phase === 'end')){ pickOpen = true; pickSel = stageIdx; return; }
+  if (e.repeat) return;
+  if (k === 'escape' && (phase === 'build' || phase === 'result' || phase === 'after' || phase === 'end')){ setPicker(true); return; }
   keys.add(k);
   if (k === ' ') latch.lay = true;
   else if (k === 'f') latch.cast = true;
@@ -3844,6 +3911,10 @@ addEventListener('keyup', e => keys.delete(e.key.toLowerCase()));
 
 /* ---------- update ---------- */
 function update(dt){
+  if (pickOpen || mobileLandscape()){
+    if (AU.ctx) setSpin(0, 3800);
+    return;
+  }
   clock += dt; boilT += dt; phaseT += dt;
   if (phase === 'build') buildT += dt;
   silkFlash = Math.max(0, silkFlash - dt); toastT = Math.max(0, toastT - dt);
@@ -3880,7 +3951,7 @@ function update(dt){
   if (phase === 'test' || phase === 'result' || phase === 'clear') bugsUpdate(dt);
   physics(dt);
   if (objSway.length) peelUpdate();
-  if (drips.length) dripsUpdate(dt);
+  dripsUpdate(dt);
   sp.vx = (sp.x - sp.ox) / dt; sp.vy = (sp.y - sp.oy) / dt;
   legsUpdate(dt);
   motesUpdate(dt);
@@ -4007,9 +4078,18 @@ function dotPath(pts, gapB, path){
     for (let j = 0; j < nb; j++){ const t = (j + 0.5) / nb, x = lerp(a[0], b[0], t), y = lerp(a[1], b[1], t); path.moveTo(x + 1.4, y); path.arc(x, y, 1.4, 0, TAU); }
   }
 }
+function hubDotRadius(big){
+  const base = big ? 7.4 : 6;
+  return touchUI ? Math.max(base, (big ? 8 : 6) / Math.max(S, 0.01)) : base;
+}
+function hubOuterRadius(big){
+  const r = hubDotRadius(big);
+  return r + (touchUI ? (big ? 10 : 8) / Math.max(S, 0.01) : (big ? 9.5 : 7));
+}
 function hubGlyph(hx, hy, big){
   // the centre: a yellow dot with short spokes round it (bug circles are dashed rings with a name, so the two never look alike)
-  const r = big ? 7.4 : 6, R0 = r + 2.4, R1 = r + (big ? 9.5 : 7), o = big ? BR.radius : BR.fine;
+  const r = hubDotRadius(big), R0 = r + (touchUI ? 3 / Math.max(S, 0.01) : 2.4), R1 = hubOuterRadius(big);
+  const base = big ? BR.radius : BR.fine, o = touchUI ? {...base, cw: Math.max(base.cw, 1.1 / Math.max(S, 0.01))} : base;
   // over the spider (whose abdomen is yellow too) a paper-white rim keeps it apart
   if (big){ ctx.fillStyle = COL.paper; ctx.beginPath(); ctx.arc(hx, hy, r + 3, 0, TAU); ctx.fill(); }
   ctx.fillStyle = rgbaOf(COL.yellow, 1); ctx.beginPath(); ctx.arc(hx, hy, r, 0, TAU); ctx.fill();
@@ -4020,7 +4100,7 @@ function hubGlyph(hx, hy, big){
 function drawHubMark(){
   // the centre: every ring is wound around this point
   if (phase !== 'build' || hubNode < 0 || DEAD[hubNode]) return;
-  const hx = SX[hubNode], hy = SY[hubNode], R = 13;
+  const hx = SX[hubNode], hy = SY[hubNode], R = hubOuterRadius(false);
   if (hubLitNow()) return;
   hubGlyph(hx, hy, false);
   const fs = 12 / S, hh = fs * 0.6;
@@ -4063,8 +4143,9 @@ function drawHubLit(){
   const fs = 12 / S;
   ctx.font = `700 ${fs.toFixed(1)}px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.lineWidth = 3.2 / S; ctx.strokeStyle = rgbaOf(COL.paper, 0.95); ctx.lineJoin = 'round';
-  ctx.strokeText('가운데', hx, hy - 18 - fs * 0.9);
-  ctx.fillStyle = rgbaOf(COL.graphite, 1); ctx.fillText('가운데', hx, hy - 18 - fs * 0.9);
+  const ly = hy - hubOuterRadius(true) - fs * 0.9 - 3 / S;
+  ctx.strokeText('가운데', hx, ly);
+  ctx.fillStyle = rgbaOf(COL.graphite, 1); ctx.fillText('가운데', hx, ly);
 }
 function drawSpiralPreview(){
   if (phase !== 'build') return;
@@ -4171,6 +4252,14 @@ function drawTargets(){
     for (let k = 0; k < nd; k++){
       const a0 = k / nd * TAU, a1 = a0 + TAU / (2 * nd);
       brush([[x + Math.cos(a0) * r, y + Math.sin(a0) * r], [x + Math.cos((a0 + a1) / 2) * r, y + Math.sin((a0 + a1) / 2) * r], [x + Math.cos(a1) * r, y + Math.sin(a1) * r]], BR.fine, 3000 + i * 40 + k, false, failed ? 1 : 0.75, cc, hc);
+    }
+    if (touchUI && r * S < 9){
+      const R = Math.max(r + 2 / S, 14 / S), L = 5 / S;
+      const o = {...BR.fine, cw: Math.max(BR.fine.cw, 1.2 / S), hw: Math.max(BR.fine.hw, 0.45 / S)};
+      for (let k = 0; k < 4; k++){
+        const a = k * Math.PI / 2;
+        brush([[x + Math.cos(a) * R, y + Math.sin(a) * R], [x + Math.cos(a) * (R + L), y + Math.sin(a) * (R + L)]], o, 3470 + i * 8 + k, false, failed ? 1 : 0.85, cc, hc);
+      }
     }
     if (failed) for (const sg of [1, -1]) brush([[x - r * 0.6, y - r * 0.6 * sg], [x + r * 0.6, y + r * 0.6 * sg]], BR.fine, 3500 + i * 3 + sg, false, 1, cc, hc);
     if (T.heavy && phase === 'build' && heavySeen[i]){
@@ -4555,7 +4644,8 @@ function pill(id, label, x, y, align, primary, enabled){
   brush(pts, primary ? UB2 : UB, hashStr(id), true);
   ctx.fillStyle = COL.graphite; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(label, x0 + w / 2, y + h / 2 + 1);
   ctx.globalAlpha = 1;
-  uiButtons.push({id, x: x0 - 5, y: y - 5, w: w + 10, h: h + 10, enabled: on});
+  const hw = touchUI ? Math.max(44, w + 10) : w + 10, hh = touchUI ? Math.max(44, h + 10) : h + 10;
+  uiButtons.push({id, x: x0 + w / 2 - hw / 2, y: y + h / 2 - hh / 2, w: hw, h: hh, enabled: on});
   return w;
 }
 function roundBtn(id, label, cx, cy, r, sub, beads){
@@ -4575,6 +4665,7 @@ function card(x, y, w, h){
 function drawUI(){
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   uiButtons = [];
+  if (mobileLandscape()){ drawRotatePrompt(); return; }
   const L = PM + 14 * UIS, T = PM + 12 * UIS;
   // the stage name is also the way to the list of stages
   const title = `${stageIdx + 1}  ${stage.name}`, canPick = phase === 'build' || phase === 'result' || phase === 'after' || phase === 'end';
@@ -4583,7 +4674,8 @@ function drawUI(){
     ctx.font = `700 ${17 * UIS}px ${FONT}`;
     const tw = ctx.measureText(title).width, cx = L + tw + 11 * UIS, cy = T + 15 * UIS, k = 4.2 * UIS;
     brush([[cx - k, cy - k * 0.55], [cx, cy + k * 0.55], [cx + k, cy - k * 0.55]], UB, 91, false, 0.85);
-    uiButtons.push({id: 'stages', x: L - 6 * UIS, y: T - 2 * UIS, w: tw + 30 * UIS, h: 32 * UIS, enabled: true});
+    const bh = touchUI ? 44 : 32 * UIS;
+    uiButtons.push({id: 'stages', x: L - 6 * UIS, y: T + 15 * UIS - bh / 2, w: Math.max(tw + 30 * UIS, touchUI ? 44 : 0), h: bh, enabled: true});
   }
   const gw = 112 * UIS, gh = 9 * UIS, gy = T + 32 * UIS;
   const frac = clamp(silkLeft / stage.budget, 0, 1);
@@ -4670,6 +4762,18 @@ function drawUI(){
   }
   if (focus) pulseButton(focus);
 }
+function drawRotatePrompt(){
+  ctx.fillStyle = rgbaOf(COL.paper, 0.94); ctx.fillRect(0, 0, SW, SH);
+  const w = Math.min(310, SW - 48), h = 118, x = SW / 2 - w / 2, y = SH / 2 - h / 2;
+  card(x, y, w, h);
+  const px = SW / 2 - 98, py = SH / 2, pw = 31, ph = 54;
+  const phone = roundRectPts(px - pw / 2, py - ph / 2, pw, ph, 5);
+  brush(phone, UB2, 9470, true);
+  brush([[px + 22, py + 15], [px + 34, py + 5], [px + 30, py - 10]], UB2, 9471, false);
+  brush([[px + 25, py - 7], [px + 30, py - 10], [px + 32, py - 4]], UB2, 9472, false);
+  text('세로로 돌려서 해주세요', SW / 2 + 26, SH / 2 - 13, 700, 17, 'center');
+  text('거미줄 칠 자리가 너무 좁아요.', SW / 2 + 26, SH / 2 + 16, 500, 13, 'center', 0.75);
+}
 function drawTitle(y0){
   // in over a moment, held, then gone; a thread hangs under the name, sagging a little
   const a = clamp(titleT / 0.35, 0, 1) * (titleT < TITLE_HOLD ? 1 : clamp(1 - (titleT - TITLE_HOLD) / (TITLE_END - TITLE_HOLD), 0, 1));
@@ -4701,7 +4805,8 @@ function undoPill(x, y, align, on){
   brush([[tx - 2.9 * UIS, ty - 3 * UIS], [tx, ty], [tx + 2.9 * UIS, ty - 3 * UIS]], UB, 8802, false);
   ctx.fillStyle = COL.graphite; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText('되돌리기', x0 + 32 * UIS, y + h / 2 + 1);
   ctx.globalAlpha = 1;
-  uiButtons.push({id: 'undo', x: x0 - 5, y: y - 5, w: w + 10, h: h + 10, enabled: on});
+  const hw = touchUI ? Math.max(44, w + 10) : w + 10, hh = touchUI ? Math.max(44, h + 10) : h + 10;
+  uiButtons.push({id: 'undo', x: x0 + w / 2 - hw / 2, y: y + h / 2 - hh / 2, w: hw, h: hh, enabled: on});
 }
 function keyLegend(focus){
   // the keys along the bottom; in the first lessons the key the hint names is lit up. returns where the row ends on the right
@@ -4764,35 +4869,53 @@ function arcadeFaceBtn(cx, cy, selected){
   ctx.beginPath(); ctx.ellipse(18.1, 25.2, 2, 2.3, 0, 0, TAU); ctx.ellipse(29.9, 25.2, 2, 2.3, 0, 0, TAU); ctx.fill();
   ctx.lineWidth = 2.3; ctx.stroke(ARCADE_SMILE_PATH);
   ctx.restore();
-  uiButtons.push({id: 'arcade', circle: true, cx, cy, r: 25 * UIS, enabled: true});
+  uiButtons.push({id: 'arcade', circle: true, cx, cy, r: touchUI ? Math.max(22, 25 * UIS) : 25 * UIS, enabled: true});
 }
 
 function drawStageList(){
   uiButtons.push({id: 'pickClose', x: 0, y: 0, w: SW, h: SH, enabled: true});
-  // one row per stage; on a short screen the rows get shorter so all of them fit.
+  // Touch screens use two columns so every row stays finger-sized instead of squeezing fifteen tiny rows into the screen.
   // the foot always leads back to the arcade; while playing, it also offers a clean restart
-  const N = STAGES.length, again = canAgain(), head = 50 * UIS, foot = 50 * UIS;
-  const rowH = Math.min(42 * UIS, (SH - 2 * PM - 24 - head - foot - 12 * UIS) / N);
-  const w = Math.min(320 * UIS, SW - 2 * PM - 20), hh = head + rowH * N + foot + 12 * UIS, x = SW / 2 - w / 2, y = Math.max(PM + 8, SH / 2 - hh / 2);
-  const fs = Math.min(15 * UIS, rowH * 0.42);
+  const N = STAGES.length, again = canAgain(), cols = touchUI ? 2 : 1, rows = Math.ceil(N / cols);
+  const head = touchUI ? 46 : 50 * UIS, foot = touchUI ? 58 : 50 * UIS;
+  const rowH = touchUI ? 44 : Math.min(42 * UIS, (SH - 2 * PM - 24 - head - foot - 12 * UIS) / rows);
+  const w = touchUI ? Math.min(380, SW - 2 * PM - 12) : Math.min(320 * UIS, SW - 2 * PM - 20);
+  const hh = head + rowH * rows + foot + 12 * UIS, x = SW / 2 - w / 2, y = Math.max(PM + 8, SH / 2 - hh / 2);
+  const fs = touchUI ? Math.max(13, 14 * UIS) : Math.min(15 * UIS, rowH * 0.42), colW = w / cols;
   ctx.fillStyle = rgbaOf(COL.paper, 0.6); ctx.fillRect(0, 0, SW, SH);
   card(x, y, w, hh);
   text('스테이지', x + 20 * UIS, y + 28 * UIS, 700, 16 * UIS, 'left');
   text(`깬 스테이지 ${cleared.size}/${N}`, x + w - 20 * UIS, y + 28 * UIS, 500, 12.5 * UIS, 'right', 0.75);
+  if (cols > 1) brush([[x + colW, y + head + 5], [x + colW, y + head + rowH * rows - 5]], BR.fine, 7098, false, 0.3);
   STAGES.forEach((st, k) => {
-    const ry = y + head + k * rowH, cur = k === stageIdx, sel = !touchUI && k === pickSel, done = cleared.has(st.id);
-    if (cur || sel){ ctx.fillStyle = rgbaOf(cur ? COL.graphite : COL.yellow, cur ? 0.08 : 0.45); ctx.fill(polyPath(roundRectPts(x + 10 * UIS, ry + 2 * UIS, w - 20 * UIS, rowH - 4 * UIS, Math.min(10 * UIS, rowH / 2 - 2)))); }
-    text(String(k + 1), x + 28 * UIS, ry + rowH / 2, 700, fs, 'center', cur ? 1 : 0.75);
-    text(st.name, x + 50 * UIS, ry + rowH / 2, cur ? 700 : 500, fs, 'left', cur ? 1 : 0.85);
+    const col = k % cols, row = Math.floor(k / cols), rx = x + col * colW, ry = y + head + row * rowH;
+    const cur = k === stageIdx, sel = !touchUI && k === pickSel, done = cleared.has(st.id);
+    if (cur || sel){ ctx.fillStyle = rgbaOf(cur ? COL.graphite : COL.yellow, cur ? 0.08 : 0.45); ctx.fill(polyPath(roundRectPts(rx + 5, ry + 2, colW - 10, rowH - 4, Math.min(10 * UIS, rowH / 2 - 2)))); }
+    const cy = ry + rowH / 2;
+    if (touchUI && done){
+      ctx.font = `700 ${fs}px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = rgbaOf(COL.beetle, 0.95);
+      ctx.fillText('✓', rx + 9 * UIS, cy);
+    }
+    text(String(k + 1), rx + 24 * UIS, cy, 700, fs, 'center', cur ? 1 : 0.75);
+    let nameFs = fs;
+    if (touchUI){
+      const nameW = colW - 43 * UIS - 8;
+      ctx.font = `${cur ? 700 : 500} ${nameFs}px ${FONT}`;
+      const measured = ctx.measureText(st.name).width;
+      if (measured > nameW) nameFs = Math.max(11.5, nameFs * nameW / measured);
+    }
+    text(st.name, rx + 43 * UIS, cy, cur ? 700 : 500, nameFs, 'left', cur ? 1 : 0.85);
     if (done){
       // cleared: a green tick at the end of the row
-      const cx = x + w - 34 * UIS, cy = ry + rowH / 2, k2 = Math.min(6 * UIS, rowH * 0.2);
-      brush([[cx - k2, cy], [cx - k2 * 0.25, cy + k2 * 0.8], [cx + k2 * 1.25, cy - k2 * 1.0]], {...BR.radius, cw: 2.2 * UIS, hw: 0.6}, 7300 + k, false, 1, rgbaOf(COL.beetle, 0.95), rgbaOf(COL.beetle, 0.6));
+      if (!touchUI){
+        const cx = rx + colW - 22 * UIS, k2 = Math.min(6 * UIS, rowH * 0.2);
+        brush([[cx - k2, cy], [cx - k2 * 0.25, cy + k2 * 0.8], [cx + k2 * 1.25, cy - k2 * 1.0]], {...BR.radius, cw: 2.2 * UIS, hw: 0.6}, 7300 + k, false, 1, rgbaOf(COL.beetle, 0.95), rgbaOf(COL.beetle, 0.6));
+      }
     }
-    if (k < N - 1) brush([[x + 18 * UIS, ry + rowH], [x + w - 18 * UIS, ry + rowH]], BR.fine, 7100 + k, false, 0.3);
-    uiButtons.push({id: 'stage' + k, x: x + 6 * UIS, y: ry, w: w - 12 * UIS, h: rowH, enabled: true});
+    if (row < rows - 1) brush([[rx + 10, ry + rowH], [rx + colW - 10, ry + rowH]], BR.fine, 7100 + k, false, 0.3);
+    uiButtons.push({id: 'stage' + k, x: rx + 3, y: ry, w: colW - 6, h: rowH, enabled: true});
   });
-  const fy = y + head + rowH * N + 4 * UIS;
+  const fy = y + head + rowH * rows + 4 * UIS;
   ctx.font = `500 ${14 * UIS}px ${FONT}`;
   const fullReset = '이 스테이지 처음부터', fullResetW = ctx.measureText(fullReset).width + 26 * UIS;
   const resetLabel = fullResetW > w - 99 * UIS ? '처음부터' : fullReset;
