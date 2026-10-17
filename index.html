@@ -63,6 +63,33 @@
   --crock:#5e3b25;
   --ginkgo:#f2c12e;
   --bin-deep:#21528a;
+  --bird:#8d939d;
+  --bird-deep:#5b616b;
+  --bird-pale:#cdd0d5;
+  --bird-cheek:#a5563a;
+  --moth:#c4ad82;
+  --moth-deep:#86704a;
+  --lamp:#46525e;
+  --lamp-glow:#ffe9a3;
+  --cherry:#d0482c;
+  --cherry-gold:#e8a23a;
+  --bark:#7a5a46;
+  --mum:#f4c21f;
+  --mum-leaf:#4c8a3a;
+  --brick:#b5583c;
+  --shelter:#2f7d5b;
+  --glass:#dcebf3;
+  --stop-sign:#2a63b9;
+  --bus:#2f9e57;
+  --bus-deep:#1f7340;
+  --bus-window:#bcd8ea;
+  --ladder:#c2c8cf;
+  --flyer:#fffaf0;
+  --flyer-ink:#d8432f;
+  --stone:#c1b9ab;
+  --stone-deep:#958c7d;
+  --roof-tile:#4f5a68;
+  --wood-seat:#b98149;
 }
 html{box-sizing:border-box}
 html,body{height:100%;margin:0;background:var(--paper);overflow:hidden;overscroll-behavior:none}
@@ -89,7 +116,11 @@ const COL = {
   water: tk('--water'), puddle: tk('--puddle'), petal: tk('--petal'), disk: tk('--disk'), ball: tk('--ball'), glove: tk('--glove'), gloveRed: tk('--glove-red'),
   pack: tk('--pack'), packDeep: tk('--pack-deep'), net: tk('--net'), bin: tk('--bin'), tile: tk('--tile'), mirror: tk('--mirror'),
   sfStem: tk('--sf-stem'), sfLeaf: tk('--sf-leaf'), diskIn: tk('--disk-in'), corn: tk('--corn'), cornLeaf: tk('--corn-leaf'), tassel: tk('--tassel'),
-  dancheong: tk('--dancheong'), dancheongRed: tk('--dancheong-red'), wood: tk('--wood'), crock: tk('--crock'), ginkgo: tk('--ginkgo'), binDeep: tk('--bin-deep')
+  dancheong: tk('--dancheong'), dancheongRed: tk('--dancheong-red'), wood: tk('--wood'), crock: tk('--crock'), ginkgo: tk('--ginkgo'), binDeep: tk('--bin-deep'),
+  bird: tk('--bird'), birdDeep: tk('--bird-deep'), birdPale: tk('--bird-pale'), birdCheek: tk('--bird-cheek'), moth: tk('--moth'), mothDeep: tk('--moth-deep'),
+  lamp: tk('--lamp'), lampGlow: tk('--lamp-glow'), cherry: tk('--cherry'), cherryGold: tk('--cherry-gold'), bark: tk('--bark'), mum: tk('--mum'), mumLeaf: tk('--mum-leaf'),
+  brick: tk('--brick'), shelter: tk('--shelter'), glass: tk('--glass'), stopSign: tk('--stop-sign'), bus: tk('--bus'), busDeep: tk('--bus-deep'), busWindow: tk('--bus-window'),
+  ladder: tk('--ladder'), flyer: tk('--flyer'), flyerInk: tk('--flyer-ink'), stone: tk('--stone'), stoneDeep: tk('--stone-deep'), roofTile: tk('--roof-tile'), woodSeat: tk('--wood-seat')
 };
 const FONT = '"Noto Sans KR", "Noto Sans CJK KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
 if (document.fonts && document.fonts.load){
@@ -240,21 +271,43 @@ function sagPts(a, b, sag, n){
 
 /* ---------- view: one comic panel; inside it a fixed 540 x 900 world ---------- */
 const VW = 540, VH = 900, GROUND = 800, PCX = VW / 2, PCY = 470, FOC = 520;
-let DPR = 1, SW = 1, SH = 1, S = 1, OX = 0, OY = 0, PM = 12, PW = 1, PH = 1, UIS = 1;
+let DPR = 1, SW = 1, SH = 1, S = 1, S0 = 1, OX = 0, OY = 0, PM = 12, PW = 1, PH = 1, UIS = 1;
 let panelArt = null;
 let touchUI = !!(window.matchMedia && matchMedia('(pointer: coarse)').matches);
-function mobileLandscape(){ return touchUI && SW > SH && S < 0.62; }
+function mobileLandscape(){ return touchUI && SW > SH && S0 < 0.62; }
 function measure(){
   SW = Math.max(1, cv.clientWidth); SH = Math.max(1, cv.clientHeight);
   DPR = Math.min(2.5, window.devicePixelRatio || 1);
   cv.width = Math.round(SW * DPR); cv.height = Math.round(SH * DPR);
   PM = Math.round(clamp(Math.min(SW, SH) * 0.025, 8, 16));
   PW = Math.max(1, SW - PM * 2); PH = Math.max(1, SH - PM * 2);
-  S = Math.min(PW / VW, PH / VH);
-  OX = PM + (PW - VW * S) / 2; OY = PM + (PH - VH * S) * 0.62;
+  S0 = Math.min(PW / VW, PH / VH);
   UIS = clamp(Math.min(PW, PH * 0.75) / 390, 0.82, 1.25);
+  placeWorld();
   panelArt = buildPanelArt();
   if (mobileLandscape()) dropAllInput();
+}
+function placeWorld(){
+  // the world as big as the panel allows, a little below the middle. on a touch screen the buttons at the bottom right must not cover it:
+  // with room beside it (a tablet on its side) it moves over to the left; otherwise it keeps above them, the ground line clear of their top row
+  S = S0; OX = PM + (PW - VW * S) / 2; OY = PM + (PH - VH * S) * 0.62;
+  if (!touchUI) return;
+  const P = padLayout();
+  if (OX + VW * S <= P.x0 - 8) return;
+  const ox = P.x0 - 8 - VW * S;
+  if (ox >= PM + 150 * UIS){ OX = ox; return; }
+  const top = P.y0 - 8;
+  S = Math.min(S0, (top - PM) / 740);
+  OX = PM + (PW - VW * S) / 2;
+  OY = Math.min(PM + (PH - VH * S) * 0.62, top - GROUND * S);
+}
+function padLayout(){
+  // the touch buttons, together at the bottom right under the right thumb: 실 in the corner, 날리기 beside it,
+  // 실 종류 and 되돌리기 a row above. the left thumb steers anywhere to the left of them. (x0, y0): the top left of the group
+  const u = UIS, R = SW - PM - 10 * u, B = SH - PM - 8 * u, r1 = 40 * u, r2 = 31 * u, r3 = 29 * u, uw = undoPillW(), uh = 32 * u;
+  const lay = [R - r1, B - r1], cast = [lay[0] - r1 - 14 * u - r2, B - r2], md = [R - 90 * u, B - 110 * u];
+  const undo = [md[0] - r3 - 16 * u - uw, md[1] - uh / 2];
+  return {lay, cast, mode: md, undo, r1, r2, r3, x0: undo[0], y0: md[1] - r3};
 }
 function buildPanelArt(){
   const x0 = PM, y0 = PM, x1 = SW - PM, y1 = SH - PM;
@@ -1048,9 +1101,12 @@ function objOffset(o){
   }
   const q = quakeAmp();
   if (q > 0){ x += q * (0.8 * Math.sin(clock * TAU * 12 + o * 2.1) + 0.45 * Math.sin(clock * TAU * 19 + o * 0.7)); y += q * 0.55 * Math.sin(clock * TAU * 15 + o * 1.3); any = true; }
-  const w = objSway[o];
+  const w = objSway[o], dp = objDip[o];
+  let px = w ? w.px : 0, py = w ? w.py : 0;
   if (w){ a = swayAngle(o); any = true; }
-  return any ? {x, y, a, px: w ? w.px : 0, py: w ? w.py : 0} : null;
+  // a twig a bird has landed on bends down about where it leaves the branch
+  if (dp && Math.abs(dp.a) > 1e-4){ a += dp.a; px = dp.px; py = dp.py; any = true; }
+  return any ? {x, y, a, px, py} : null;
 }
 function applyXf(xf, bx, by){
   if (!xf) return [bx, by];
@@ -1103,6 +1159,185 @@ function drawWorld(){
     if (Ly.after) Ly.after();
     ctx.restore();
   }
+}
+
+/* ---------- under a street lamp at dusk: the lamp with its arm out over the pavement, a cherry tree in its autumn red ---------- */
+function streetLampItems(x, top, seed){
+  // a slender post on a base plate, its hatch, old flyers taped on and torn off; the arm bending out to a long lamp head (top: the top of the arm)
+  const g = GROUND, r = mulberry32(seed), items = [];
+  items.push({pts: [[x - 6, g + 2], [x - 4.4, top + 300], [x - 3.6, top + 58], [x + 3.6, top + 58], [x + 4.4, top + 300], [x + 6, g + 2]], o: BR.sign, seed, closed: true, color: COL.lamp});
+  items.push({pts: [[x - 11, g + 2], [x - 10, g - 16], [x + 10, g - 16], [x + 11, g + 2]], o: BR.sign, seed: seed + 1, closed: true, color: '#38424c'});
+  items.push({pts: rectPts(x - 3.4, g - 150, x + 3.4, g - 104), o: BR.fine, seed: seed + 2, closed: true, color: '#5a6672'});
+  for (let k = 0; k < 4; k++){
+    const y = top + 330 + k * 46 + r() * 16, w = 8 + r() * 6, h = 12 + r() * 16, sd = r() < 0.5 ? -1 : 1;
+    items.push({pts: [[x - 4.6, y], [x + sd * w * 0.4, y - 3], [x + 5.4, y + h * 0.4], [x + 3, y + h], [x - 4.2, y + h * 0.75]], o: BR.grain, seed: seed + 10 + k, closed: true, color: k % 2 ? 'rgba(255,250,236,0.95)' : 'rgba(250,224,186,0.95)'});
+    items.push({pts: rectPts(x - 6.5, y - 3, x + 6.5, y + 1.5), o: BR.grain, seed: seed + 20 + k, closed: true, color: 'rgba(214,208,184,0.9)'});
+  }
+  const arm = catmull([[x, top + 62], [x + 3, top + 30], [x + 28, top + 8], [x + 84, top], [x + 130, top + 4]], 6);
+  const armIt = taperItem(arm, 7.5, 5, seed + 30, BR.sign); armIt.color = COL.lamp; items.push(armIt);
+  const head = closedCurve([[x + 116, top], [x + 150, top - 9], [x + 186, top - 7], [x + 199, top + 4], [x + 192, top + 16], [x + 150, top + 21], [x + 120, top + 16]], 4);
+  items.push({pts: head, o: BR.sign, seed: seed + 31, closed: true, color: COL.lamp});
+  items.push({pts: [[x + 126, top + 1], [x + 160, top - 5], [x + 184, top - 3]], o: BR.fine, seed: seed + 32});
+  items.push({pts: [[x + 126, top + 16], [x + 190, top + 13], [x + 186, top + 21], [x + 131, top + 23]], o: BR.fine, seed: seed + 33, closed: true, color: '#fff4c9'});
+  return {items, arm, head, light: [x + 158, top + 20]};
+}
+function lampGlow(cx, cy){
+  // the light it throws round itself in the dusk (a layer of its own, behind everything)
+  return () => {
+    const gr = ctx.createRadialGradient(cx, cy, 6, cx, cy + 24, 190);
+    gr.addColorStop(0, rgbaOf(COL.lampGlow, 0.9)); gr.addColorStop(0.3, rgbaOf(COL.lampGlow, 0.45)); gr.addColorStop(1, rgbaOf(COL.lampGlow, 0));
+    ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(cx, cy + 24, 190, 0, TAU); ctx.fill();
+  };
+}
+function colorLeaf(cx, cy, ang, len, wid, seed, col){
+  const it = leafItems(cx, cy, ang, len, wid, seed);
+  it[0].fill = false; it[0].color = col;
+  return it;
+}
+function cherryTreeItems(x0, x1, by, seed){
+  // a street cherry: smooth red-brown bark ringed with pale bands of pores, one bough reaching out left in its autumn red
+  const g = GROUND, r = mulberry32(seed), items = [], L = [], R = [];
+  for (let y = -80; y <= g; y += 20){ const fl = Math.max(0, (y - 700) / 100) ** 2 * 14; L.push([x0 + Math.sin(y * 0.03) * 1.5 - fl, y]); R.push([x1 + Math.sin(y * 0.027 + 1) * 1.5 + fl, y]); }
+  items.push({pts: [...L, ...R.reverse()], o: BR.stem, seed, closed: true, color: COL.bark});
+  for (let k = 0; k < 30; k++){
+    const y = -60 + r() * (g - 70), w = (x1 - x0) * (0.25 + r() * 0.45), xs = x0 + 4 + r() * (x1 - x0 - 8 - w);
+    items.push({pts: rectPts(xs, y, xs + w, y + 2.4), o: BR.grain, seed: seed + 10 + k, closed: true, color: 'rgba(236,212,188,0.85)'});
+  }
+  const bough = catmull([[x0 + 4, by], [x0 - 30, by - 28], [x0 - 70, by - 50], [x0 - 110, by - 62], [x0 - 146, by - 66]], 8);
+  const bIt = taperItem(bough, 15, 4, seed + 50, BR.stem); bIt.color = COL.bark; items.push(bIt);
+  const twig = catmull([[x0 - 70, by - 50], [x0 - 82, by - 76], [x0 - 88, by - 100]], 6);
+  const tIt = taperItem(twig, 5, 1.6, seed + 51, BR.leaf); tIt.color = COL.bark; items.push(tIt);
+  const twig2 = catmull([[x0 - 30, by - 28], [x0 - 22, by - 56], [x0 - 26, by - 84]], 6);
+  const t2 = taperItem(twig2, 5, 1.6, seed + 52, BR.leaf); t2.color = COL.bark; items.push(t2);
+  const cols = [COL.cherry, COL.cherryGold, COL.cherry, '#e06a2c'];
+  const along = [...bough.slice(3), ...twig.slice(2), ...twig2.slice(2)];
+  for (let k = 0; k < 24; k++){
+    const p = along[Math.floor(r() * along.length)], a = (r() < 0.5 ? -1 : 1) * (0.6 + r() * 1.6) + Math.PI / 2 * (r() < 0.5 ? 1 : 0.3);
+    items.push(...colorLeaf(p[0], p[1], a, 22 + r() * 8, 11, seed + 60 + k * 2, cols[k % cols.length]));
+  }
+  return {items, bough};
+}
+function mumPotItems(x, seed){
+  // a clay pot of yellow chrysanthemums someone set out by the post
+  const g = GROUND, r = mulberry32(seed), items = [];
+  items.push({pts: [[x - 22, g - 42], [x + 22, g - 42], [x + 17, g + 1], [x - 17, g + 1]], o: BR.sign, seed, closed: true, color: COL.brick});
+  items.push({pts: rectPts(x - 26, g - 50, x + 26, g - 41), o: BR.sign, seed: seed + 1, closed: true, color: COL.brick});
+  for (let k = 0; k < 9; k++){ const a = -Math.PI + 0.25 + k / 8 * (Math.PI - 0.5), d = 22 + r() * 6; items.push(...colorLeaf(x + Math.cos(a) * 6, g - 50 + Math.sin(a) * 4, a, d, 10, seed + 10 + k * 2, COL.mumLeaf)); }
+  for (let k = 0; k < 13; k++){
+    const a = -Math.PI + 0.2 + r() * (Math.PI - 0.4), d = 6 + r() * 20, fx = x + Math.cos(a) * d * 1.35, fy = g - 62 + Math.sin(a) * d * 0.8;
+    const pts = []; for (let j = 0; j < 16; j++){ const b = j / 16 * TAU, rr = j % 2 ? 4 : 6.2; pts.push([fx + Math.cos(b) * rr, fy + Math.sin(b) * rr * 0.85]); }
+    items.push({pts, o: BR.fine, seed: seed + 40 + k, closed: true, color: COL.mum});
+    items.push({pts: ellipsePts(fx, fy, 1.8, 1.6, 8), o: BR.grain, seed: seed + 60 + k, closed: true, color: '#c98a10'});
+  }
+  return items;
+}
+/* ---------- a bus stop by the road: a shelter with a glass back and a bench, the stop sign on its pole ---------- */
+function shelterItems(x0, x1, roofY, seed){
+  const g = GROUND, items = [];
+  // the glass roof on its green frame, the two posts
+  items.push({pts: [[x0 - 30, roofY - 15], [x1 + 42, roofY - 15], [x1 + 42, roofY - 2], [x0 - 30, roofY - 2]], o: BR.leaf, seed, closed: true, color: rgbaOf(COL.glass, 0.95)});
+  items.push({pts: rectPts(x0 - 30, roofY - 3, x1 + 42, roofY + 12), o: BR.sign, seed: seed + 1, closed: true, color: COL.shelter});
+  [x0, x1].forEach((px, k) => items.push({pts: rectPts(px - 4.5, roofY + 12, px + 4.5, g + 2), o: BR.sign, seed: seed + 2 + k, closed: true, color: COL.shelter}));
+  // the glass back, light streaking across it
+  items.push({pts: rectPts(x0 + 5, roofY + 24, x1 - 5, g - 176), o: BR.fine, seed: seed + 5, closed: true, color: rgbaOf(COL.glass, 0.55)});
+  for (let k = 0; k < 3; k++){ const a = x0 + 46 + k * 42; items.push({pts: [[a, roofY + 36], [a + 16, roofY + 36], [a - 30, roofY + 230], [a - 46, roofY + 230]], o: BR.grain, seed: seed + 6 + k, closed: true, color: 'rgba(255,255,255,0.6)'}); }
+  // the route map on the glass: lines of four colours with their stops
+  const mx = x1 - 70, my = roofY + 44;
+  items.push({pts: rectPts(mx, my, mx + 52, my + 128), o: BR.leaf, seed: seed + 10, closed: true, color: COL.paper});
+  ['#2a63b9', '#2f9e57', '#d8432f', '#f4c21f'].forEach((c, k) => {
+    const y = my + 18 + k * 28;
+    items.push({pts: [[mx + 7, y], [mx + 45, y - 6], [mx + 45, y - 3], [mx + 7, y + 3]], o: BR.grain, seed: seed + 11 + k, closed: true, color: c});
+    for (let j = 0; j < 3; j++) items.push({pts: ellipsePts(mx + 12 + j * 14, y - 1 - j * 2, 1.8, 1.8, 6), o: BR.grain, seed: seed + 20 + k * 3 + j, closed: true, color: COL.paper});
+  });
+  // the bench: two wooden slats on a metal frame
+  const sy = g - 160;
+  items.push({pts: rectPts(x0 + 14, sy, x1 - 14, sy + 9), o: BR.sign, seed: seed + 30, closed: true, color: COL.woodSeat});
+  items.push({pts: rectPts(x0 + 14, sy + 11, x1 - 14, sy + 19), o: BR.sign, seed: seed + 31, closed: true, color: COL.woodSeat});
+  [x0 + 26, x1 - 26].forEach((lx, k) => items.push({pts: rectPts(lx - 3, sy + 19, lx + 3, g + 2), o: BR.fine, seed: seed + 32 + k, closed: true, color: '#55616c'}));
+  return items;
+}
+function fleabaneItems(pts, seed){
+  // a tall fleabane by the stop: a thin stalk with narrow leaves low down, a few small white flowers still out round its tip
+  const r = mulberry32(seed), items = [], st = taperItem(pts, 4.6, 2.2, seed, BR.leaf);
+  st.color = '#7f9a4a'; items.push(st);
+  for (let i = 6, k = 0; i < pts.length - 13; i += 5, k++){
+    const p = pts[i], sd = k % 2 ? 1 : -1, a = -Math.PI / 2 + sd * (0.9 + r() * 0.4);
+    items.push(...colorLeaf(p[0], p[1], a, 22 + r() * 10, 5.5, seed + 10 + k * 2, '#86a552'));
+  }
+  const t = pts[pts.length - 1];
+  for (let k = 0; k < 5; k++){
+    const a = -Math.PI / 2 + (k - 2) * 0.55, L = 16 + r() * 10, base = pts[pts.length - 4 - k % 2];
+    const end = [base[0] + Math.cos(a) * L, base[1] + Math.sin(a) * L - 4];
+    items.push({pts: catmull([base, [lerp(base[0], end[0], 0.5), lerp(base[1], end[1], 0.5) - 2], end], 3), o: BR.fine, seed: seed + 40 + k});
+    const pet = []; for (let j = 0; j < 30; j++){ const b = j / 30 * TAU, rr = j % 2 ? 4.4 : 5.8; pet.push([end[0] + Math.cos(b) * rr, end[1] + Math.sin(b) * rr * 0.8]); }
+    items.push({pts: pet, o: BR.grain, seed: seed + 50 + k, closed: true, color: 'rgba(255,255,255,0.97)'});
+    items.push({pts: ellipsePts(end[0], end[1], 2, 1.7, 8), o: BR.grain, seed: seed + 60 + k, closed: true, color: '#f0c419'});
+  }
+  items.push({pts: ellipsePts(t[0], t[1] - 2, 2.6, 3.2, 8), o: BR.fine, seed: seed + 70, closed: true, color: '#9bb35e'});
+  return items;
+}
+function stopSignItems(x, top, seed){
+  // the stop sign: a blue plate on a pole, a bus drawn on it, the numbers of the buses that stop here
+  const g = GROUND, items = [];
+  items.push({pts: rectPts(x - 5, top + 134, x + 5, g + 2), o: BR.sign, seed, closed: true, color: '#8d99a6'});
+  items.push({pts: rectPts(x - 50, top, x + 50, top + 136), o: BR.sign, seed: seed + 1, closed: true, color: COL.stopSign});
+  items.push({pts: rectPts(x - 43, top + 7, x + 43, top + 62), o: BR.fine, seed: seed + 2, closed: true, color: COL.paper});
+  const bx = x - 31, by = top + 15;
+  items.push({pts: roundRectPts(bx, by, 62, 32, 6), o: BR.fine, seed: seed + 3, closed: true, color: COL.stopSign});
+  for (let k = 0; k < 3; k++) items.push({pts: rectPts(bx + 6 + k * 18, by + 5, bx + 19 + k * 18, by + 16), o: BR.grain, seed: seed + 4 + k, closed: true, color: COL.paper});
+  [bx + 14, bx + 48].forEach((wx, k) => items.push({pts: ellipsePts(wx, by + 32, 5.4, 5.4, 10), o: BR.grain, seed: seed + 8 + k, closed: true, color: COL.graphite}));
+  for (let k = 0; k < 3; k++) for (let j = 0; j < 4; j++) items.push({pts: rectPts(x - 40 + j * 21, top + 74 + k * 19, x - 26 + j * 21, top + 87 + k * 19), o: BR.grain, seed: seed + 20 + k * 4 + j, closed: true, color: 'rgba(255,255,255,0.92)'});
+  return items;
+}
+/* ---------- a persimmon tree in late autumn by a stone wall: bare but for the few fruit left on it for the birds ---------- */
+function persimmonLean(y){ return y < 360 ? -Math.pow((360 - y) / 260, 1.5) * 70 : 0; }
+function persimmonTreeItems(seed){
+  // the old trunk, dark and cracked into blocks; a bough out over the yard with a branch going up off it, and bare twigs
+  const g = GROUND, r = mulberry32(seed), items = [], L = [], R = [];
+  for (let y = -80; y <= g; y += 20){ const fl = Math.max(0, (y - 690) / 110) ** 2 * 18, ln = persimmonLean(y); L.push([10 + ln + Math.sin(y * 0.04) * 2 - fl, y]); R.push([62 + ln + Math.sin(y * 0.035 + 1) * 2 + fl, y]); }
+  items.push({pts: [...L, ...R.reverse()], o: BR.stem, seed, closed: true, color: '#6e5a4b'});
+  for (let k = 0; k < 70; k++){
+    // the cracks between the plates of bark: short, mostly up and down, joined now and then by one across
+    const y = -60 + r() * (g - 70), x = 16 + r() * 42 + persimmonLean(y), h = 8 + r() * 16, lean = (r() - 0.5) * 3;
+    items.push({pts: [[x, y], [x + lean * 0.5, y + h * 0.5], [x + lean, y + h]], o: BR.grain, seed: seed + 10 + k});
+    if (r() < 0.35) items.push({pts: [[x, y + h], [x + (r() < 0.5 ? -1 : 1) * (5 + r() * 6), y + h + (r() - 0.5) * 2]], o: BR.grain, seed: seed + 100 + k});
+  }
+  const bough = catmull([[58, 306], [122, 282], [190, 258], [250, 236], [308, 214], [354, 203]], 8);
+  const bIt = taperItem(bough, 20, 5, seed + 50, BR.stem); bIt.color = '#6e5a4b'; items.push(bIt);
+  const sub = catmull([[184, 260], [204, 224], [228, 190], [248, 160]], 6);
+  const sIt = taperItem(sub, 8, 2.6, seed + 51, BR.leaf); sIt.color = '#6e5a4b'; items.push(sIt);
+  for (const [a, b, c] of [[[96, 290], [88, 262], [94, 238]], [[284, 222], [300, 192], [296, 168]], [[228, 190], [252, 184], [270, 172]], [[150, 272], [158, 300], [148, 322]]]){
+    const p = catmull([a, b, c], 5), it = taperItem(p, 4, 1.4, seed + 60 + Math.round(a[0]), BR.leaf); it.color = '#6e5a4b'; items.push(it);
+  }
+  return {items, bough, sub};
+}
+function persimmonFruit(x, y, seed){
+  // a ripe persimmon left on the tree: squat and round, deep orange, its dry calyx on top, a dent where birds have been at it
+  const items = [{pts: closedCurve([[x - 14, y - 1], [x - 11, y - 11], [x, y - 13], [x + 11, y - 11], [x + 14, y - 1], [x + 10, y + 10], [x, y + 13], [x - 10, y + 10]], 3), o: BR.leaf, seed, closed: true, color: COL.persimmon}];
+  items.push({pts: closedCurve([[x + 3, y + 1], [x + 9, y - 2], [x + 11, y + 5], [x + 6, y + 9]], 3), o: BR.grain, seed: seed + 1, closed: true, color: '#c4501a'});
+  items.push({pts: [[x - 8, y - 6], [x - 5, y - 9], [x - 2, y - 9], [x - 5, y - 6]], o: BR.grain, seed: seed + 2, closed: true, color: 'rgba(255,255,255,0.75)'});
+  for (let k = 0; k < 4; k++){ const a = k / 4 * TAU + 0.5; items.push({pts: [[x, y - 12], [x + Math.cos(a) * 7, y - 12 + Math.sin(a) * 3], [x + Math.cos(a + 0.3) * 4, y - 12 + Math.sin(a + 0.3) * 1.6]], o: BR.fine, seed: seed + 3 + k, closed: true, color: '#6e5a32'}); }
+  return items;
+}
+function stoneWallItems(x0, top, seed){
+  // a village wall of field stones set in earth, a row of roof tiles along its top
+  const g = GROUND, r = mulberry32(seed), items = [], x1 = VW + 90;
+  items.push({pts: [[x0, g + 2], [x0, top + 14], [x1, top + 14], [x1, g + 2]], o: BR.sign, seed, closed: true, color: '#d8cfbf'});
+  for (let y = top + 19, row = 0; y < g - 8; y += 29, row++){
+    for (let x = x0 + 3 + (row % 2) * 17; x < x1 - 10; x += 38 + r() * 9){
+      const w = 31 + r() * 9, h = 22 + r() * 5, cx = x + w / 2, cy = y + h / 2;
+      const pts = closedCurve([[cx - w / 2, cy - h * 0.1], [cx - w * 0.3, cy - h / 2], [cx + w * 0.25, cy - h / 2 + r() * 3], [cx + w / 2, cy], [cx + w * 0.3, cy + h / 2], [cx - w * 0.35, cy + h / 2 - r() * 3]], 3);
+      items.push({pts, o: BR.leaf, seed: seed + 10 + row * 41 + Math.round(x), closed: true, color: r() < 0.5 ? COL.stone : '#aea596'});
+    }
+  }
+  items.push({pts: rectPts(x0 - 14, top - 2, x1, top + 15), o: BR.sign, seed: seed + 1, closed: true, color: COL.roofTile});
+  for (let x = x0 - 6; x < x1; x += 18){ items.push({pts: ellipsePts(x, top + 13, 8, 6, 10), o: BR.fine, seed: seed + 3000 + x, closed: true, color: '#3e4753'}); items.push({pts: [[x + 9, top - 2], [x + 9, top + 8]], o: BR.grain, seed: seed + 3500 + x}); }
+  return items;
+}
+function fallenLeafItems(x0, x1, n, seed, cols){
+  const r = mulberry32(seed), items = [];
+  for (let k = 0; k < n; k++){ const x = lerp(x0, x1, r()), a = r() * TAU; items.push(...colorLeaf(x - Math.cos(a) * 9, GROUND - 2 - r() * 3, a * 0.2 + (r() < 0.5 ? 0 : Math.PI), 18 + r() * 6, 9, seed + 10 + k * 2, cols[k % cols.length])); }
+  return items;
 }
 
 /* ---------- stages ---------- */
@@ -1444,6 +1679,55 @@ const STAGES = [
     }
   },
   {
+    // six gnats round a fleabane by a bus stop: three on a small round and three on a big one, both about the tip of the stalk.
+    // with the tip as the centre two rings go through all six; any other centre takes more rings than there is silk for
+    // the silk is enough for a web centred on the tip with a line over each circle and two rings, not for three rings round any other centre
+    id: 'busstop', season: 4, name: '버스 정류장', wind: [-70, -5], budget: 2400, destroyer: 'bus', needBridge: false,
+    intro: '하루살이 여섯 마리가 개망초 둘레로 와요. 실이 빠듯해서 끈끈이는 두 바퀴밖에 못 감아요.',
+    early(){
+      // centred on the tip, before the sticky silk: which circles no line from the tip goes over yet
+      const tip = stageInfo.tip;
+      if (mode !== 'drag' || hubNode !== tip || stats.sticky > 0) return '';
+      const open = stage.bugs.length - stage.bugs.filter(d => tipLines(tip).some(c => chainOver(c, d.at[0], d.at[1], catchR(BUGT[d.type])))).length;
+      return open > 0 ? `아직 줄이 안 지나간 동그라미가 ${open}개 있어요. 꼭대기에서 그 동그라미 위로도 줄을 쳐요.` : '';
+    },
+    clue(){
+      // as on the stake: the centre at the very tip, built up line by line, one line over each circle, then two rings
+      const tip = stageInfo.tip, hubTop = hubNode === tip, far = "여섯 마리 모두 개망초 꼭대기에서 거리가 둘 중 하나예요. 꼭대기를 '가운데'로 삼으면 두 바퀴로 다 지나가요.";
+      if (mode === 'sticky') return hubTop ? '' : (stageLate() ? far : '');
+      if (hubTop) return '';
+      const n = tipLines(tip).length;
+      if (sp.lay && n > 0 && sp.lay.start !== tip) return `이 줄은 꼭대기가 아닌 데서 시작했어요. 꼭대기 끝에 서서 시작해야 꼭대기에 줄이 모여요. ${obj('undo')} 누르면 취소돼요.`;
+      // a centre made somewhere else first: the tip takes it over once more lines meet there than there
+      const need = hubNode >= 0 ? frameDeg(hubNode) + 1 : 3;
+      if (n > 0) return `꼭대기에서 동그라미마다 줄을 하나씩 쳐요. 꼭대기에 줄이 ${['세', '네', '다섯', '여섯', '일곱', '여덟'][need - 3] || need} 개 모이면 꼭대기가 '가운데'가 돼요. (지금 ${n}개)`;
+      if (!stageLate()) return '';
+      if (sp.state === 'walk' && tipNode() === tip) return `여기서 ${obj('lay')} 누른 채 걸어가면 줄이 꼭대기에서 나와요.`;
+      return far;
+    },
+    bugs: [{type: 'gnat', at: [292, 450], delay: 0.5}, {type: 'gnat', at: [256, 520], delay: 0.9}, {type: 'gnat', at: [366, 447], delay: 1.3},
+      {type: 'gnat', at: [298, 384], delay: 1.7}, {type: 'gnat', at: [334, 510], delay: 2.1}, {type: 'gnat', at: [415, 499], delay: 2.5}],
+    build(){
+      const g = GROUND, xL = 34, xR = 206, roofY = 248, px = 468, top = 176;
+      const ground = addSurface([[-60, g], [VW + 60, g]], -1, K_GROUND, false);
+      const pL = addSurface([[xL, g], [xL, roofY]], 0, K_SURF, false), pR = addSurface([[xR, g], [xR, roofY]], 0, K_SURF, false);
+      const roof = addSurface([[xL - 28, roofY], [xR + 40, roofY]], 0, K_SURF, false);
+      joinSurf(pL[0], nearestOf(ground, xL, g)); joinSurf(pR[0], nearestOf(ground, xR, g));
+      joinSurf(pL[pL.length - 1], nearestOf(roof, xL, roofY)); joinSurf(pR[pR.length - 1], nearestOf(roof, xR, roofY));
+      const seat = addSurface([[xL + 14, g - 160], [xR - 14, g - 160]], 0, K_SURF, false);
+      joinSurf(seat[0], nearestOf(pL, xL, g - 160)); joinSurf(seat[seat.length - 1], nearestOf(pR, xR, g - 160));
+      const pole = addSurface([[px, g], [px, top + 136]], 1, K_SURF, false);
+      const plate = addSurface(rectPts(px - 50, top, px + 50, top + 136), 1, K_SURF, true);
+      joinSurf(pole[0], nearestOf(ground, px, g)); joinSurf(pole[pole.length - 1], nearestOf(plate, px, top + 136));
+      // the fleabane: its tip is the middle of both rounds of gnats
+      const wp = catmull([[318, g], [322, 700], [331, 590], [334, 520], [330, 468]], 10), weed = addSurface(wp, 2, K_SURF, false);
+      joinSurf(weed[0], nearestOf(ground, 318, g));
+      const art = [makeLayer(0, shelterItems(xL, xR, roofY, 2401)), makeLayer(1, stopSignItems(px, top, 2451)), makeLayer(2, fleabaneItems(wp, 2471)),
+        makeLayer(-1, [...groundItems(g), ...fallenLeafItems(-20, VW + 20, 9, 2481, [COL.leafFall, COL.ginkgo, COL.cherry])])];
+      return {start: nearestOf(pole, px, 700), art, objs: [120, px, 326], tip: weed[weed.length - 1]};
+    }
+  },
+  {
     // a wide puddle after the rain, gnats low over it. a line dropped over the water has nothing to land on and just hangs:
     // a second line low across the water first, and the web is hung from that
     id: 'puddle', season: 5, name: '물웅덩이', wind: [68, -5], budget: 7000, destroyer: 'splash', needBridge: true,
@@ -1503,6 +1787,34 @@ const STAGES = [
     }
   },
   {
+    // moths go round the lamp, and a wasp's way runs right through their round. the round comes down low under the lamp:
+    // the one ring through the two flies reaches it there, under the wasp's way, if the centre is put at just the right height
+    id: 'lamp', season: 5, name: '가로등 밑', wind: [-64, -5], budget: 2600, destroyer: 'flyer', dz: {x: 66, y0: 380, y1: 620}, needBridge: false,
+    intro: '가로등에 불이 들어왔어요. 나방이 불빛 둘레를 빙빙 돌아요. 끈끈이가 나방 길을 한 군데만 가로질러도 붙어요.',
+    clue(){
+      const mi = stage.bugs.findIndex(d => BUGT[d.type].orbit);
+      if (mi < 0 || orbitHot[mi]) return '';
+      if (stats.sticky > 0 && uncovered() > 0) return '나방 길의 아래쪽 끝은 말벌 길보다 낮아요. 파리 둘을 지나는 바퀴가 거기까지 닿게, 가운데를 조금 위로 옮겨 보세요.';
+      if (stageLate()) return '파리 둘을 지나는 한 바퀴가 나방 길 아래쪽 끝도 지나가게 하면, 말벌 길에는 닿지 않아요.';
+      return '';
+    },
+    bugs: [{type: 'fly', at: [164, 412], delay: 0.5}, {type: 'moth', ...mothWay([224, 286], 80, 48, 2, [330, 90], [-70, 80]), delay: 0.9},
+      {type: 'fly', at: [284, 412], delay: 1.5}, {type: 'wasp', path: wayOut([[575, 278], [-40, 296]]), label: 108, delay: 2.6}],
+    build(){
+      const g = GROUND, lx = 66;
+      const ground = addSurface([[-60, g], [VW + 60, g]], -1, K_GROUND, false);
+      const L = streetLampItems(lx, 250, 2301), C = cherryTreeItems(436, 478, 386, 2351);
+      const post = addSurface([[lx, g], [lx, 312]], 0, K_SURF, false); joinSurf(post[0], nearestOf(ground, lx, g));
+      const arm = addSurface(L.arm, 0, K_SURF, false); joinSurf(arm[0], post[post.length - 1]);
+      const head = addSurface(L.head, 0, K_SURF, true), ae = arm[arm.length - 1]; joinSurf(ae, nearestOf(head, X[ae], Y[ae]));
+      const trunk = addSurface([[436, g], [436, -40]], 1, K_SURF, false); joinSurf(trunk[0], nearestOf(ground, 436, g));
+      const bough = addSurface(C.bough, 1, K_SURF, false); joinSurf(bough[0], nearestOf(trunk, 436, 386));
+      const art = [makeLayer(-1, [], lampGlow(L.light[0], L.light[1])), makeLayer(1, C.items), makeLayer(0, L.items), makeLayer(2, mumPotItems(122, 2381)),
+        makeLayer(-1, [...groundItems(g), ...fallenLeafItems(260, VW + 30, 11, 2391, [COL.cherry, COL.cherryGold, '#e06a2c'])])];
+      return {start: nearestOf(post, lx, 700), art, objs: [lx, 456, 122]};
+    }
+  },
+  {
     // two wasps go to and fro by a rubbish bin, one above the flies and one below; sticky silk may touch neither way.
     // the flies sit in an arch over the knob on the bin's lid: a full web round a centre among them reaches one way or the other,
     // but with the knob as the centre and lines only upward from it, one half ring goes through all three
@@ -1552,9 +1864,42 @@ const STAGES = [
     }
   },
   {
+    // birds come for the last persimmons; a twig dips under a bird and anything fastened to it comes off.
+    // the bough, the bare twigs and the wall stay put
+    id: 'kkachibap', season: 6, name: '까치밥', wind: [-62, -5], budget: 4200, destroyer: 'ladder', needBridge: false,
+    intro: '감나무에 까치밥이 몇 개 남았어요. 새들이 감을 먹으러 와요.',
+    clue(){
+      const n = linesOnDips();
+      if (n > 0 && birdToast) return `감 달린 가지에 걸린 줄이 아직 ${n}개 있어요. 새가 앉으면 떨어져요.`;
+      if (stageLate() && uncovered() > 0) return '새는 감이 달린 가지에만 앉아요. 큰 가지나 감 없는 잔가지, 담에 걸어 보세요.';
+      return '';
+    },
+    bugs: [{type: 'fly', at: [300, 372], delay: 0.5}, {type: 'gnat', at: [236, 402], delay: 1.5}, {type: 'fly', at: [372, 404], delay: 2.4}],
+    build(){
+      const g = GROUND, T = persimmonTreeItems(2101);
+      const ground = addSurface([[-60, g], [VW + 60, g]], -1, K_GROUND, false);
+      const tp = []; for (let y = g; y >= 60; y -= 20) tp.push([62 + persimmonLean(y), y]);
+      const trunk = addSurface(tp, 0, K_SURF, false); joinSurf(trunk[0], nearestOf(ground, 62, g));
+      const bough = addSurface(T.bough, 0, K_SURF, false); joinSurf(bough[0], nearestOf(trunk, 62, 306));
+      const sub = addSurface(T.sub, 0, K_SURF, false); joinSurf(sub[0], nearestOf(bough, 184, 260));
+      const art = [makeLayer(0, T.items)], dips = [];
+      [[122, 281, 150, 334, 153, 350], [238, 238, 286, 272, 290, 288], [318, 211, 376, 232, 380, 248]].forEach(([bx, by, tx, ty, fx, fy], k) => {
+        const o = 2 + k, pts = catmull([[bx, by], [lerp(bx, tx, 0.5) + 4, lerp(by, ty, 0.5) - 3], [tx, ty]], 6);
+        // the twig as something to fasten to starts a little way out, so a line put on the bough by its foot stays on the bough
+        const s = addSurface(pts.filter(p => Math.hypot(p[0] - bx, p[1] - by) > 10), o, K_SURF, false); joinSurf(s[0], nearestOf(bough, bx, by));
+        const it = taperItem(pts, 5, 2.2, 2150 + k * 20, BR.leaf); it.color = '#6e5a4b';
+        art.push(makeLayer(o, [it, {pts: [[tx, ty], [fx, fy - 12]], o: BR.fine, seed: 2160 + k * 20}, ...persimmonFruit(fx, fy, 2170 + k * 20)]));
+        dips.push({o, px: bx, py: by, sign: tx > bx ? 1 : -1, perch: pts[Math.round((pts.length - 1) * 0.68)], fruit: [fx, fy]});
+      });
+      const wall = addSurface([[420, g], [420, 458], [VW + 60, 458]], 1, K_SURF, false); joinSurf(wall[0], nearestOf(ground, 420, g));
+      art.push(makeLayer(1, stoneWallItems(420, 458, 2201)), makeLayer(-1, [...groundItems(g), ...fallenLeafItems(-20, VW + 20, 16, 2251, [COL.persimmon, '#c9562a', '#e0a83a', '#8a5a2a'])]));
+      return {start: nearestOf(trunk, 62, 740), art, objs: [36, 480, 136, 262, 348], dips};
+    }
+  },
+  {
     // the first frost. a corner of a fence: a wasp still comes by over it, a grasshopper heavy enough to tear through lands in the corner,
     // and there is little silk. a small web in the corner, its centre right by the grasshopper, keeps under the wasp's way
-    id: 'frost', season: 7, noCast: true, name: '첫서리', wind: [-60, -5], budget: 800, destroyer: 'strap', needBridge: false,
+    id: 'frost', season: 7, noCast: true, name: '첫서리', wind: [-60, -5], budget: 800, destroyer: 'strap', needBridge: false, bird: true,
     intro: '첫서리가 내렸어요. 말벌도, 무거운 메뚜기도 와요. 실은 조금밖에 없어요.',
     clue(){
       const h = heavyClue(); if (h) return h;
@@ -1658,6 +2003,7 @@ function bitsUpdate(dt){
   for (const b of bits){
     if (b.land >= 0) continue;
     if (b.kind === 'dew'){ b.vy += 560 * dt; b.vx += (w[0] * 0.25 - b.vx) * Math.min(1, dt * 2); }
+    else if (b.kind === 'fruit'){ b.vy += 520 * dt; b.vx *= 1 - Math.min(1, dt * 1.5); }   // a scrap of persimmon flicked off by a beak
     else { b.vy += (22 - b.vy) * Math.min(1, dt * 2); b.vx += (w[0] * 0.6 + Math.sin(clock * 3 + b.t0) * 14 - b.vx) * Math.min(1, dt * 1.5); }
     b.x += b.vx * dt; b.y += b.vy * dt;
     if (b.y >= GROUND - 1.5){ b.y = GROUND - 1.5; b.land = clock; }
@@ -1675,7 +2021,8 @@ function drawBits(){
       const pts = ellipsePts(b.x, b.y, 2.2, 2.7, 12);
       ctx.fillStyle = COL.paper; ctx.fill(polyPath(pts)); brush(pts, BR.fine, 1603, true, 0.9);
       ctx.fillStyle = rgbaOf(COL.glint, 0.95); ctx.beginPath(); ctx.arc(b.x - 0.7, b.y - 0.9, 0.75, 0, TAU); ctx.fill();
-    } else if (b.land < 0){ ctx.fillStyle = rgbaOf(COL.graphite, 0.7); ctx.beginPath(); ctx.arc(b.x, b.y, 0.9, 0, TAU); ctx.fill(); }
+    } else if (b.kind === 'fruit'){ if (b.land < 0){ ctx.fillStyle = rgbaOf(COL.persimmon, 0.95); ctx.beginPath(); ctx.ellipse(b.x, b.y, 1.9, 1.4, b.t0 * 7, 0, TAU); ctx.fill(); } }
+    else if (b.land < 0){ ctx.fillStyle = rgbaOf(COL.graphite, 0.7); ctx.beginPath(); ctx.arc(b.x, b.y, 0.9, 0, TAU); ctx.fill(); }
   }
 }
 function glintOn(ch){ const n = ch.nodes; if (n.length < 3) return; const p = n[1 + Math.floor(Math.random() * (n.length - 2))]; if (!DEAD[p]) glints.push({p, t0: clock + rnd(0, 0.3), r: rnd(3.2, 5.2)}); }
@@ -1867,7 +2214,7 @@ function makeSpider(){
     group: ((k % 2 === 0) === (side === 1)) ? 0 : 1, state: 'air', hold: null, to: null, t: 0, fx: 0, fy: 0, sx: 0, sy: 0, hx: 0, hy: 0, tx: 0, ty: 0
   }));
   return {state: 'walk', c: -1, t: 0, x: 0, y: 0, z: 0, h: -Math.PI / 2, vx: 0, vy: 0, ox: 0, oy: 0, legs, moving: false, dropT: 0, reachCD: 0, idleT: 0,
-    lay: null, cast: null, hang: null, spi: null, reel: null, pose: 0, lastMove: [0, -1], castFails: 0, cheer: 0, hop: 0, hopW: 1, wag: 0};
+    lay: null, cast: null, hang: null, spi: null, reel: null, fall: null, go: null, pose: 0, lastMove: [0, -1], castFails: 0, cheer: 0, hop: 0, hopW: 1, wag: 0};
 }
 function snapLegPose(){
   const c = Math.cos(sp.h), s = Math.sin(sp.h), bx = sp.x, by = sp.y - sp.hop;
@@ -1886,7 +2233,7 @@ function placeOn(node){
   let c = -1;
   for (const e of ADJ[node]) if (isWalk(e)){ c = e; break; }
   if (c < 0) return false;
-  sp.c = c; sp.t = CI[c] === node ? 0 : 1;
+  sp.c = c; sp.t = CI[c] === node ? 0 : 1; sp.go = null;
   const p = edgePos(); sp.x = p[0]; sp.y = p[1]; sp.z = p[2];
   return true;
 }
@@ -1934,32 +2281,97 @@ function nearNode(){
 }
 function relocate(){
   if (sp.spi) pushSpiralUndo(sp.spi);
-  sp.lay = null; sp.cast = null; sp.spi = null; sp.hang = null;
+  sp.lay = null; sp.cast = null; sp.spi = null; sp.hang = null; sp.fall = null;
   let q = nearestStand(sp.x, sp.y, 120);
   if (q < 0) q = stageInfo.start;
   sp.state = 'walk'; placeOn(q);
 }
 function turnTo(target, dt, rate){ sp.h += angDiff(sp.h, target) * Math.min(1, dt * rate); }
-function edgeAim(node, c){
-  // which way a branch heads: a point a little way along it, so a bowed line counts by where it goes, not by its first kink
-  let prev = node, cur = CI[c] === node ? CJ[c] : CI[c], len = Math.hypot(X[cur] - X[node], Y[cur] - Y[node]), guard = 0;
-  while (len < 22 && guard++ < 6 && KIND[cur] === K_THREAD){
-    let next = -1, cnt = 0;
-    for (const e of ADJ[cur]){ if (!isWalk(e)) continue; const o = CI[e] === cur ? CJ[e] : CI[e]; if (o === prev) continue; cnt++; next = o; }
-    if (cnt !== 1) break;
-    len += Math.hypot(X[next] - X[cur], Y[next] - Y[cur]); prev = cur; cur = next;
+// how well a branch leaving a node goes the way the stick points. two things count, the better of them:
+// the way the branch runs (a point well along it, followed past bends and the little joints where lines meet stems, until it forks),
+// so a line bent near a busy junction or a branch behind a joint counts for where it really goes;
+// and anywhere it leads within a short walk, forks included, so a branch a little way along a line counts too
+// (a little less than a branch right here going the same way)
+const REACH_L = 22, RUN_L = 60, SHORT_C = 5, REACH_MIN = 0.5, FORK_PEN = 0.12;
+const reachStack = [], reachSeen = new Map(), onRun = new Set();
+function edgeReach(node, c, dx, dy){
+  const x0 = X[node], y0 = Y[node], o = CI[c] === node ? CJ[c] : CI[c];
+  const fx = X[o] - x0, fy = Y[o] - y0, fd = Math.hypot(fx, fy);
+  let best = -2, guard = 0;
+  onRun.clear(); onRun.add(o);
+  {
+    // the run of the line: straight on through each node (across a short joint any way at all), until a corner or a fork with nothing straight on
+    let prev = node, cur = o, len = fd, g = 0, ux = fd >= SHORT_C ? fx / fd : 0, uy = fd >= SHORT_C ? fy / fd : 0;
+    while (len < RUN_L && g++ < 24){
+      let next = -1, bt = -2, cnt = 0;
+      for (const e of ADJ[cur]){
+        if (!isWalk(e)) continue;
+        const j = CI[e] === cur ? CJ[e] : CI[e];
+        if (j === prev || DEAD[j] || KIND[j] === K_BUG) continue;
+        cnt++;
+        const ex = X[j] - X[cur], ey = Y[j] - Y[cur], el = Math.hypot(ex, ey);
+        const t = el < SHORT_C ? 0.83 : (ux === 0 && uy === 0) ? 1 : (ex * ux + ey * uy) / el;
+        if (t > bt){ bt = t; next = j; }
+      }
+      // (straight after a short joint there is no way it came in by: at a fork it cannot tell which way is straight on)
+      if (next < 0 || next === node || bt < (cnt > 1 ? 0.82 : 0.64) || (cnt > 1 && ux === 0 && uy === 0)) break;
+      const sl = Math.hypot(X[next] - X[cur], Y[next] - Y[cur]);
+      if (sl >= SHORT_C){ ux = (X[next] - X[cur]) / sl; uy = (Y[next] - Y[cur]) / sl; }
+      len += sl; prev = cur; cur = next; onRun.add(cur);
+    }
+    const vx = X[cur] - x0, vy = Y[cur] - y0, d = Math.hypot(vx, vy);
+    if (d >= 3) best = (vx * dx + vy * dy) / d;
   }
-  const ex = X[cur] - X[node], ey = Y[cur] - Y[node], el = Math.hypot(ex, ey) || 1e-6;
-  return [ex / el, ey / el];
+  // then the forks: every point a short walk away that is off the run (the run itself counts only by where it heads, not by its kinks)
+  reachSeen.clear(); reachStack.length = 0;
+  reachStack.push(o, fd);
+  while (reachStack.length && guard++ < 64){
+    const acc = reachStack.pop(), i = reachStack.pop();
+    const seen = reachSeen.get(i); if (seen !== undefined && seen <= acc) continue;
+    reachSeen.set(i, acc);
+    const vx = X[i] - x0, vy = Y[i] - y0, d = Math.hypot(vx, vy);
+    if (d >= 3 && !onRun.has(i)){ const s = (vx * dx + vy * dy) / d - FORK_PEN; if (s > best) best = s; }
+    for (const e of ADJ[i]){
+      if (e === c || !isWalk(e)) continue;
+      const j = CI[e] === i ? CJ[e] : CI[e];
+      if (j === node || DEAD[j] || KIND[j] === K_BUG) continue;
+      const a2 = acc + Math.hypot(X[j] - X[i], Y[j] - Y[i]);
+      if (a2 <= REACH_L) reachStack.push(j, a2);
+    }
+  }
+  if (best > -2) return best;
+  return fd > 1e-6 ? (fx * dx + fy * dy) / fd : 0;
 }
-function bestEdgeAt(node, dx, dy, exclude, minScore){
+let bestScore = 0;
+function bestEdgeAt(node, dx, dy, exclude, minScore, on){
+  // on: the way the line the spider is on runs on through this node; its straight continuation is left out (only the branches count)
   let best = -1, bs = minScore;
   for (const c of ADJ[node]){
     if (c === exclude || !isWalk(c)) continue;
-    const u = edgeAim(node, c), s = u[0] * dx + u[1] * dy;
+    // a branch that sets off against the push only leads back here, however well it turns later (stepping across a gap, any will do)
+    const o = CI[c] === node ? CJ[c] : CI[c], ex = X[o] - X[node], ey = Y[o] - Y[node], L = Math.hypot(ex, ey);
+    if (minScore > -1 && L >= SHORT_C && (ex * dx + ey * dy) / L < -0.3) continue;
+    if (on && L >= SHORT_C && (ex * on[0] + ey * on[1]) / L > 0.7) continue;
+    const s = edgeReach(node, c, dx, dy);
     if (s > bs){ bs = s; best = c; }
   }
+  bestScore = bs;
   return best;
+}
+let alongF = 0, alongR = 0;
+function edgeAlong(c, dx, dy, keep){
+  // how much going along edge c goes the way (dx, dy): + toward CJ[c], - toward CI[c], 0 if neither way does.
+  // a line straight across the push, or a short joint, goes by where its ends lead: toward a fork a little way along, or the branch behind a joint.
+  // alongF and alongR keep how well each way leads on, judged like any branch.
+  // keep: the way the spider was already going along this line; it holds while that way still leads where the stick points,
+  // so the dip its own weight makes in the line under it (enough, by a busy junction, to tip a short bit of line the other way) cannot turn it round
+  const a = CI[c], b = CJ[c], ex = X[b] - X[a], ey = Y[b] - Y[a], L = Math.hypot(ex, ey);
+  alongF = edgeReach(a, c, dx, dy); alongR = edgeReach(b, c, dx, dy);
+  const raw = L >= SHORT_C ? (ex * dx + ey * dy) / L : 0;
+  if (keep){ const k = keep > 0 ? alongF : alongR; if (k >= REACH_MIN) return keep * (raw * keep >= 0.3 ? raw * keep : k); }
+  if (Math.abs(raw) >= 0.3) return raw;
+  const s = alongF >= alongR ? alongF : -alongR;
+  return Math.abs(s) >= REACH_MIN ? s : 0;
 }
 function settle(dt){
   const p = edgePos(), k = Math.min(1, dt * 22);
@@ -1977,7 +2389,7 @@ function walkUpdate(dt){
   const m = inp.mag;
   sp.moving = false;
   sp.reachCD = Math.max(0, sp.reachCD - dt);
-  if (m < 0.14){ sp.dropT = 0; sp.idleT += dt; settle(dt); return; }
+  if (m < 0.14){ sp.dropT = 0; sp.idleT += dt; sp.go = null; settle(dt); return; }
   // setting off from standstill, the line that best matches the stick wins outright; once moving, the current line is kept unless another is clearly better
   const hyst = sp.idleT > 0.08 ? 0 : 0.06;
   sp.idleT = 0;
@@ -1987,43 +2399,51 @@ function walkUpdate(dt){
     const f = upFoot(sp.x, sp.y, 48);
     if (f >= 0 && Math.abs(X[f] - sp.x) > 2.5){ dx = Math.sign(X[f] - sp.x); dy = 0; }
   }
+  // the way it was already going along the line it is on, while the stick points about the same way
+  const keepOf = c => sp.go && sp.go.c === c && sp.go.dx * dx + sp.go.dy * dy > 0.8 ? sp.go.sg : 0;
+  const goOn = (c, node) => { sp.go = {c, sg: CI[c] === node ? 1 : -1, dx, dy}; };
   {
-    // close to a junction whose branch points the way the stick does: take that branch
-    const a = CI[sp.c], b = CJ[sp.c], ex = X[b] - X[a], ey = Y[b] - Y[a], L = Math.hypot(ex, ey) || 1e-6;
-    const along = Math.abs((ex * dx + ey * dy) / L), dA = sp.t * L, dB = (1 - sp.t) * L;
-    let bc = -1, bn = -1, bs = along + hyst;
+    // close to a junction whose branch goes the way the stick does better than going on along this line: take that branch
+    const a = CI[sp.c], b = CJ[sp.c], L = Math.hypot(X[b] - X[a], Y[b] - Y[a]) || 1e-6, kp = keepOf(sp.c);
+    const al = edgeAlong(sp.c, dx, dy, kp), stay = al > 0 ? alongF : al < 0 ? alongR : 0, dA = sp.t * L, dB = (1 - sp.t) * L;
+    let bc = -1, bn = -1, bs = stay + hyst;
     for (const [node, dn] of [[a, dA], [b, dB]]){
-      if (dn > 7) continue;
-      const nc = bestEdgeAt(node, dx, dy, sp.c, bs);
-      if (nc >= 0){ const u = edgeAim(node, nc); bs = u[0] * dx + u[1] * dy; bc = nc; bn = node; }
+      // only where lines really meet (going on along the same line needs no jump to the node), and while the stick holds its way,
+      // only the junction ahead, not one just passed
+      if (dn > 7 || walkDeg(node) < 3 || (kp > 0 && node === a) || (kp < 0 && node === b)) continue;
+      const other = node === a ? b : a, ux = X[node] - X[other], uy = Y[node] - Y[other], ul = Math.hypot(ux, uy);
+      const nc = bestEdgeAt(node, dx, dy, sp.c, bs, ul >= SHORT_C ? [ux / ul, uy / ul] : null);
+      if (nc >= 0){ bs = bestScore; bc = nc; bn = node; }
     }
-    if (bc >= 0){ sp.c = bc; sp.t = CI[bc] === bn ? 0 : 1; }
+    if (bc >= 0){ sp.c = bc; sp.t = CI[bc] === bn ? 0 : 1; goOn(bc, bn); }
   }
   let move = SPEED * Math.pow(m, 1.35) * dt, guard = 0, blocked = false;
   while (move > 1e-5 && guard++ < 12){
     const a = CI[sp.c], b = CJ[sp.c];
     const ex = X[b] - X[a], ey = Y[b] - Y[a], L = Math.hypot(ex, ey) || 1e-6;
-    const along = (ex * dx + ey * dy) / L;
-    if (Math.abs(along) >= 0.3){
+    const along = edgeAlong(sp.c, dx, dy, keepOf(sp.c));
+    if (along !== 0){
       const sg = along > 0 ? 1 : -1, f = 0.45 + 0.55 * Math.abs(along);
       const step = move * f, rem = sg > 0 ? (1 - sp.t) * L : sp.t * L;
-      sp.lastMove = [sg * ex / L, sg * ey / L];
+      if (L >= SHORT_C) sp.lastMove = [sg * ex / L, sg * ey / L];   // a short joint says nothing about which way the spider faces
+      sp.go = {c: sp.c, sg, dx, dy};
       if (step <= rem){ sp.t += sg * step / L; move = 0; sp.moving = true; break; }
       move -= rem / f;
       const node = sg > 0 ? b : a;
       sp.t = sg > 0 ? 1 : 0;
       const nc = bestEdgeAt(node, dx, dy, sp.c, 0.2);
       if (nc < 0){ blocked = true; break; }
-      sp.c = nc; sp.t = CI[nc] === node ? 0 : 1; sp.moving = true;
+      sp.c = nc; sp.t = CI[nc] === node ? 0 : 1; sp.moving = true; goOn(nc, node);
     } else {
       const dA = sp.t * L, dB = (1 - sp.t) * L;
       const node = dA < dB ? a : b;
       const nc = bestEdgeAt(node, dx, dy, sp.c, 0.5);
-      if (nc >= 0 && Math.min(dA, dB) < 4.5){ sp.c = nc; sp.t = CI[nc] === node ? 0 : 1; continue; }
+      if (nc >= 0 && Math.min(dA, dB) < 4.5){ sp.c = nc; sp.t = CI[nc] === node ? 0 : 1; goOn(nc, node); continue; }
       blocked = true; break;
     }
   }
   if (blocked){
+    sp.go = null;
     // pushing down off a line means drop (not while a frame thread is being laid: that would throw it away); any other way, try to step across a small gap
     const wantsDrop = dy > 0.55 && canDropHere() && !sp.lay;
     if (!wantsDrop && sp.reachCD <= 0 && tryReach(dx, dy)){ sp.reachCD = 0.22; sp.dropT = 0; }
@@ -2072,7 +2492,8 @@ function startHang(){
   const top = silkNode(); if (top < 0) return;
   const s = spinneret();
   sp.state = 'hang'; sp.lay = null;
-  sp.hang = {top, L: Math.max(8, Math.hypot(s[0] - X[top], s[1] - Y[top]) + 2), x: s[0], y: s[1] + 4, px: s[0], py: s[1] + 2};
+  sp.hang = {top, L: Math.max(8, Math.hypot(s[0] - X[top], s[1] - Y[top]) + 2), x: s[0], y: s[1] + 4, px: s[0], py: s[1] + 2,
+    slipAt: slipRoll('hang') ? rnd(45, 140) : 0};   // now and then the dragline parts on the way down, once it is this long
   for (const lg of sp.legs) unplant(lg);
 }
 function hangUpdate(dt){
@@ -2095,6 +2516,11 @@ function hangUpdate(dt){
   if (stageInfo.water && overWater(sp.x) && sp.y > GROUND - 14) stageInfo.wet = true;
   sp.z = Z[top];
   sp.moving = false;
+  if (H.slipAt > 0 && H.L >= H.slipAt){
+    // only while going down, and not just over the ground or over water (there is nothing to fall onto there); otherwise this one holds
+    if (sp.y > GROUND - 40 || nearWater(sp.x)) H.slipAt = 0;
+    else if (iy > 0.2){ hangSnap(); return; }
+  }
   if (H.L > 14){
     // the feet land somewhere clearly away from where the dragline is fastened, never back on the line it was dropped from
     // (a line sagging steeply away downwind would otherwise catch the spider as it swings out)
@@ -2109,6 +2535,129 @@ function land(q){
   const D = Math.hypot(X[q] - X[top], Y[q] - Y[top], Z[q] - Z[top]);
   if (D <= silkLeft){ const ch = makeChain(top, q, 'drag', 0.985, 'drop'); spend(ch); }
   sp.state = 'walk'; placeOn(q);
+}
+/* ---------- slips: now and then a thread still being made gives way. a line cast on the wind parts in the air; a line being laid snaps,
+   and once in a while the spider loses its footing with it and falls; a dragline parts on the way down and the spider falls.
+   the web already up never breaks this way, and no silk is lost: only the time. not in the first lessons ---------- */
+const SLIP = {cast: 0.18, lay: 0.1, layFall: 0.35, hang: 0.15};
+let slipCool = 0, slipForce = '';   // slipForce, for the test page only: 'never', 'always', or 'fall' (always, and a line being laid takes the spider with it)
+function slipRoll(kind){
+  if (phase !== 'build' || stage.tut || slipForce === 'never') return false;
+  if (slipForce === 'always' || slipForce === 'fall') return true;
+  return slipCool <= 0 && Math.random() < SLIP[kind];
+}
+function slipped(msg){ slipCool = rnd(20, 32); toast(msg, 2); }
+function nearWater(x){ const w = stageInfo.water; return !!w && x > w[0] - 16 && x < w[1] + 16; }
+function snapSound(len, x){
+  // a thread giving way: a dull pluck and the tick of it parting
+  if (clock - AU.lastSnap > 0.03){ AU.lastSnap = clock; pluck(clamp(6000 / Math.max(len, 8), 180, 1500), 0.17, panOf(x)); }
+  noiseHit(0.05, 3600, 1800, 1.2, 0.06);
+  vib(12);
+}
+function castSnap(){
+  // it parts somewhere along: the far part goes on with the wind, the near part is drawn back in
+  const C = sp.cast, P = C.pts, n = P.length, k = clamp(Math.round(n * rnd(0.25, 0.5)), 2, n - 2);
+  addLoose(P.slice(k), -1);
+  sp.reel = {pts: P.slice(0, k + 1).map(p => [p.x, p.y]), t: 0};
+  sp.cast = null; sp.state = 'walk';
+  snapSound(C.len, P[k].x);
+  slipped('날리던 실이 끊어졌어요.');
+}
+function layWatch(){
+  // the line being laid snaps once it is as long as was drawn for it; it hangs from where it was fastened and blows about
+  const L = sp.lay;
+  if (!L || !(L.slipAt > 0) || DEAD[L.start]) return;
+  const s = spinneret(), a = [X[L.start], Y[L.start]], D = Math.hypot(s[0] - a[0], s[1] - a[1]);
+  if (D < L.slipAt) return;
+  sp.lay = null;
+  addLoose(sagPts(a, s, Math.min(16, D * 0.07), Math.max(3, Math.round(D / 9))), L.start);
+  snapSound(D, s[0]);
+  if (L.fall && canFall()){ startFall(sp.vx * 0.3, 0); slipped('발을 헛디뎌서 떨어졌어요.'); }
+  else slipped('치던 줄이 끊어졌어요.');
+}
+function canFall(){
+  // a foot slips off a thread, not off a stem or a post; high enough to matter, clear of anything right beside it to catch, and over ground
+  if (!isWalk(sp.c) || (KIND[CI[sp.c]] !== K_THREAD && KIND[CJ[sp.c]] !== K_THREAD)) return false;
+  if (sp.y > GROUND - 50 || nearWater(sp.x)) return false;
+  return nearestStand(sp.x, sp.y, 16, i => KIND[i] === K_SURF || KIND[i] === K_GROUND) < 0;
+}
+function hangSnap(){
+  // the upper part stays, hanging from where it was fastened; the spider falls
+  const H = sp.hang, top = H.top, n = Math.max(3, Math.round(H.L / 9)), pts = [];
+  for (let k = 0; k <= n; k++) pts.push([lerp(X[top], H.x, k / n), lerp(Y[top], H.y, k / n)]);
+  addLoose(pts.slice(0, Math.max(2, Math.round(n * rnd(0.45, 0.75))) + 1), top);
+  snapSound(H.L, H.x);
+  startFall((H.x - H.px) / STEP * 0.5, Math.max(0, (H.y - H.py) / STEP));
+  slipped('줄이 끊어져서 떨어졌어요.');
+}
+function startFall(vx, vy){
+  sp.state = 'fall'; sp.lay = null; sp.cast = null; sp.hang = null; sp.spi = null; sp.moving = false;
+  sp.fall = {vx, vy, t: 0, y0: sp.y};
+  for (const lg of sp.legs) unplant(lg);
+}
+function fallUpdate(dt){
+  const F = sp.fall; if (!F){ relocate(); return; }
+  F.t += dt;
+  const w = windVec(), y0 = sp.y;
+  F.vy = Math.min(F.vy + 900 * dt, 640);
+  F.vx += (w[0] * 0.2 - F.vx) * Math.min(1, dt * 1.5);
+  sp.x = clamp(sp.x + F.vx * dt, 16, VW - 16); sp.y += F.vy * dt; sp.z = 0;
+  turnTo(Math.PI / 2, dt, 2.5);
+  sp.moving = false;
+  // it comes down on the first thing under it that will take it: a stem, a post, a branch, the ground. through threads it just falls
+  if (sp.y > F.y0 + 10){
+    const q = nearestStand(sp.x, sp.y, 7, i => (KIND[i] === K_SURF || KIND[i] === K_GROUND) && Y[i] >= y0 - 2);
+    if (q >= 0){ fallLand(q); return; }
+  }
+  if (sp.y >= GROUND - 1){
+    let q = nearestStand(sp.x, GROUND, 40, i => KIND[i] === K_GROUND);
+    if (q < 0) q = nearestStand(sp.x, sp.y, 400);
+    if (q >= 0) fallLand(q); else relocate();
+  }
+}
+function fallLand(q){
+  const v = sp.fall ? sp.fall.vy : 0;
+  sp.fall = null; sp.state = 'walk'; sp.idleT = 0;
+  placeOn(q); sp.h = -Math.PI / 2 + rnd(-0.35, 0.35);
+  for (const lg of sp.legs) unplant(lg);
+  thump(clamp(0.08 + v / 2600, 0.08, 0.3)); vib(18);
+}
+/* loose pieces of silk: they drift on the wind and sink slowly, fading; one end may still be fastened where it was */
+let loose = [];
+function addLoose(pts, pin){
+  if (pts.length < 2) return;
+  const P = pts.map(p => Array.isArray(p) ? {x: p[0], y: p[1], px: p[0], py: p[1]} : {x: p.x, y: p.y, px: p.px, py: p.py});
+  let len = 0; for (let i = 1; i < P.length; i++) len += Math.hypot(P[i].x - P[i - 1].x, P[i].y - P[i - 1].y);
+  loose.push({P, pin: pin >= 0 ? pin : -1, seg: Math.max(2, len / (P.length - 1)), t0: clock, life: rnd(1.7, 2.4), seed: 7100 + Math.floor(Math.random() * 400)});
+}
+function looseUpdate(dt){
+  if (!loose.length) return;
+  const w = windVec();
+  for (const L of loose){
+    if (L.pin >= 0 && (L.pin >= X.length || DEAD[L.pin])) L.pin = -1;
+    const P = L.P, n = P.length;
+    for (let i = 0; i < n; i++){
+      const q = P[i];
+      if (i === 0 && L.pin >= 0){ q.px = q.x; q.py = q.y; q.x = X[L.pin]; q.y = Y[L.pin]; continue; }
+      const vx = q.x - q.px, vy = q.y - q.py, tx = (w[0] * 0.6 + Math.sin(clock * 2.1 + i * 0.18 + L.seed) * 8) * dt, ty = (w[1] * 0.6 + 20 + Math.cos(clock * 1.7 + i * 0.15) * 6) * dt;
+      q.px = q.x; q.py = q.y;
+      q.x += vx + (tx - vx) * 0.05; q.y += vy + (ty - vy) * 0.05;
+    }
+    // a strand: no stretching, and it does not ball up either
+    for (let it = 0; it < 4; it++) for (let i = 0; i < n - 1; i++){
+      const a = P[i], b = P[i + 1], dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy) || 1e-6;
+      const r = d > L.seg ? L.seg : d < L.seg * 0.75 ? L.seg * 0.75 : d; if (r === d) continue;
+      const wa = i === 0 && L.pin >= 0 ? 0 : 1, k = (d - r) / d / (wa + 1);
+      a.x += dx * k * wa; a.y += dy * k * wa; b.x -= dx * k; b.y -= dy * k;
+    }
+  }
+  loose = loose.filter(L => clock - L.t0 < L.life);
+}
+function drawLoose(){
+  for (const L of loose){
+    const a = 0.8 * (1 - smooth((clock - L.t0 - L.life + 0.8) / 0.8));
+    if (a > 0.01) brush(L.P.map(q => [q.x, q.y]), BR.radius, L.seed, false, a);
+  }
 }
 const HUB_SNAP = 24;
 function hubNear(){ if (hubNode < 0 || DEAD[hubNode]) return false; const s = spinneret(); return Math.hypot(s[0] - X[hubNode], s[1] - Y[hubNode]) <= HUB_SNAP; }
@@ -2136,7 +2685,8 @@ function onLayPress(){
   if (mode === 'sticky' && hubNode >= 0){ startSpiral(); return; }
   // near the centre a frame thread always starts exactly at the centre: the spider's body covers the mark, so nobody can stand on it to the pixel
   const j = hubNear() ? hubNode : snapNode();
-  sp.lay = {start: j >= 0 ? j : silkNode()};
+  // now and then the line snaps once it is this long (and once in a while the spider falls with it)
+  sp.lay = {start: j >= 0 ? j : silkNode(), slipAt: slipRoll('lay') ? rnd(45, 150) : 0, fall: slipForce ? slipForce === 'fall' : Math.random() < SLIP.layFall};
 }
 function onLayRelease(){
   if (sp.state === 'spiral') return;
@@ -2156,7 +2706,8 @@ function onCastPress(){
   const node = nearNode(); if (node < 0) return;
   sp.state = 'cast'; sp.lay = null; sp.reel = null;
   const s = spinneret();
-  sp.cast = {node, pts: [{x: s[0], y: s[1], px: s[0], py: s[1]}], len: 0, caught: -1, t: 0};
+  // now and then the line parts in the air once this much is out, before it catches anywhere
+  sp.cast = {node, pts: [{x: s[0], y: s[1], px: s[0], py: s[1]}], len: 0, caught: -1, t: 0, slipAt: slipRoll('cast') ? rnd(70, 200) : 0};
 }
 function settleHold(dt){ const p = edgePos(), k = Math.min(1, dt * 22); sp.x += (p[0] - sp.x) * k; sp.y += (p[1] - sp.y) * k; sp.z = p[2]; sp.moving = false; }
 function castUpdate(dt){
@@ -2172,6 +2723,7 @@ function castUpdate(dt){
     const maxL = Math.min(470, silkLeft);
     C.len = Math.min(maxL, C.len + 100 * dt);
     while ((P.length - 1) * 5 < C.len) P.splice(1, 0, {x: s[0], y: s[1], px: s[0], py: s[1]});
+    if (C.slipAt > 0 && C.len >= C.slipAt && P.length > 5){ castSnap(); return; }
   }
   const n = P.length;
   for (let i = 1; i < n; i++){
@@ -2473,7 +3025,8 @@ function grabFor(lg, tx, ty){
   return best;
 }
 function legsUpdate(dt){
-  const free = sp.state === 'hang' || sp.state === 'drop';
+  if (sp.state === 'gone') return;
+  const free = sp.state === 'hang' || sp.state === 'drop' || sp.state === 'fall' || sp.state === 'taken';
   const busy = [false, false];
   for (const lg of sp.legs) if (lg.state === 'step') busy[lg.group] = true;
   const c = Math.cos(sp.h), s = Math.sin(sp.h);
@@ -2496,6 +3049,7 @@ function legsUpdate(dt){
       continue;
     }
     if (free){ rx = rx * 0.42 + 4; ry *= 0.5; }
+    if (sp.state === 'taken'){ rx += Math.sin(clock * 14 + lg.k * 1.7 + lg.side) * 7; ry *= 1.25 + 0.35 * Math.sin(clock * 12 + lg.k * 2.3); }
     const tx = sp.x + c * rx - s * ry + sp.vx * lead, ty = sp.y + s * rx + c * ry + sp.vy * lead;
     lg.tx = tx; lg.ty = ty;
     if (free){ if (lg.state !== 'air') unplant(lg); const k = Math.min(1, dt * 14); lg.fx += (tx - lg.fx) * k; lg.fy += (ty - lg.fy) * k; continue; }
@@ -2574,8 +3128,62 @@ const BUGT = {
   beetle: {name: '풍뎅이', r: 20.5, m: 30, v: 300, hit: 2500, approach: 1.4, buzz: 84, size: 2.15, heavy: 6},
   hopper: {name: '메뚜기', r: 20.5, m: 24, v: 300, hit: 2300, approach: 1.3, buzz: 64, size: 1.55, heavy: 6},
   // a wasp is not caught: it flies through along its way, and if it touches sticky silk it tears the web
-  wasp:   {name: '말벌', r: 7, m: 6, v: 0, hit: 0, approach: 0, buzz: 118, size: 1.95, lane: true, speed: 215}
+  wasp:   {name: '말벌', r: 7, m: 6, v: 0, hit: 0, approach: 0, buzz: 118, size: 1.95, lane: true, speed: 215},
+  // a moth goes round and round a lamp: sticky silk anywhere across its round catches it
+  moth:   {name: '나방', r: 6, m: 1.4, v: 140, hit: 520, approach: 0, buzz: 64, size: 1.55, orbit: true, speed: 150}
 };
+function mothWay(c, rx, ry, laps, from, to){
+  // a moth's way: in from off the picture, round the lamp (clockwise) so many times, and off again. only the round is drawn
+  const loop = [];
+  for (let k = 0; k <= 48; k++){ const a = -Math.PI / 2 + k / 48 * TAU; loop.push([c[0] + Math.cos(a) * rx, c[1] + Math.sin(a) * ry]); }
+  const path = [from];
+  for (let l = 0; l < laps; l++) path.push(...loop.slice(l ? 1 : 0));
+  path.push(to);
+  return {path, loop};
+}
+let orbitHot = [];
+function orbitScan(){
+  // which moth rounds have sticky silk across them now
+  stage.bugs.forEach((d, i) => {
+    orbitHot[i] = false;
+    if (!BUGT[d.type].orbit) return;
+    const R = BUGT[d.type].r + 1.5, P = d.loop, L = polyLen(P);
+    for (let s = 0; s <= L; s += 5){ const a = alongPath(P, s); if (stickyNear(a[0], a[1], R) !== null){ orbitHot[i] = true; return; } }
+  });
+}
+function orbitUpdate(b, dt){
+  // round the lamp, fluttering a little off its line; the first sticky thread across its way holds it
+  b.s += b.T.speed * dt;
+  const p = alongPath(b.orbit, b.s);
+  b.x = p[0] + Math.sin(clock * 7 + b.s * 0.03) * 2.2; b.y = p[1] + Math.sin(clock * 11 + b.s * 0.05) * 2.6; b.ang = p[2]; b.z = 0;
+  buzzSet(b.voice, 0.05, panOf(b.x));
+  if (stickyNear(b.x, b.y, b.T.r + 1.5) !== null){ mothCaught(b); return; }
+  if (b.s >= b.orbitLen){ b.state = 'gone'; b.fail = 'orbit'; if (b.impactT < 0) b.impactT = testT; buzzStop(b.voice); b.voice = null; }
+}
+function mothCaught(b){
+  // stuck where it met the silk, held by the threads around that spot
+  b.tx = b.x; b.ty = b.y; b.impactT = testT; lastImpact = testT;
+  const R = catchR(b.T) + 1.5, hits = new Map();
+  forNear(b.x, b.y, R + 10, i => {
+    if (DEAD[i] || KIND[i] !== K_THREAD) return;
+    for (const c of ADJ[i]){
+      if (!isWalk(c) || CCH[c] < 0) continue;
+      const ch = CHAINS[CCH[c]]; if (ch.dead) continue;
+      const j = CI[c] === i ? CJ[c] : CI[c];
+      if (segDist(b.x, b.y, X[i], Y[i], X[j], Y[j]) > R) continue;
+      const near = Math.hypot(X[i] - b.x, Y[i] - b.y) <= Math.hypot(X[j] - b.x, Y[j] - b.y) ? i : j;
+      if (KIND[near] !== K_THREAD) continue;
+      hits.set(near, (hits.get(near) || false) || ch.type === 'sticky');
+    }
+  });
+  const list = [...hits.entries()].sort((p, q) => Math.hypot(X[p[0]] - b.x, Y[p[0]] - b.y) - Math.hypot(X[q[0]] - b.x, Y[q[0]] - b.y)).slice(0, 12);
+  if (!list.some(e => e[1])) return;
+  noiseHit(0.09, 1100, 260, 0.9, 0.18, 'lowpass');
+  const B = addP(b.x, b.y, 0, 0, -1, K_BUG);
+  INV[B] = 1 / b.T.m; PX[B] = b.x - Math.cos(b.ang) * 1.2; PY[B] = b.y - Math.sin(b.ang) * 1.2;
+  b.p = B; b.state = 'stuck'; b.kick = 0.25;
+  for (const [p, st] of list){ const r = Math.max(1, Math.hypot(X[p] - b.x, Y[p] - b.y)); b.links.push({c: addC(B, p, r, 0.9, -1, false), sticky: st, rest: r}); }
+}
 let bugs = [], testT = 0, lastImpact = -1;
 function polyLen(P){ let s = 0; for (let i = 1; i < P.length; i++) s += Math.hypot(P[i][0] - P[i - 1][0], P[i][1] - P[i - 1][1]); return s; }
 function alongPath(P, s){
@@ -2593,6 +3201,11 @@ function makeBugs(){
       const P = d.path;
       return {type: d.type, T, lane: P, laneLen: polyLen(P), s: 0, delay: d.delay, state: 'wait', t: 0, x: P[0][0], y: P[0][1], z: 0, vz: 0, p: -1, links: [], voice: null, kick: 0, buzzT: 0,
         impactT: -1, ang: Math.atan2(P[1][1] - P[0][1], P[1][0] - P[0][0]), fail: null, tx: P[0][0], ty: P[0][1], hitAt: null};
+    }
+    if (T.orbit){
+      const P = d.path;
+      return {type: d.type, T, orbit: P, orbitLen: polyLen(P), s: 0, delay: d.delay, state: 'wait', t: 0, x: P[0][0], y: P[0][1], z: 0, vz: 0, p: -1, links: [], voice: null, kick: 0, buzzT: 0,
+        impactT: -1, ang: Math.atan2(P[1][1] - P[0][1], P[1][0] - P[0][0]), fail: null, tx: P[0][0], ty: P[0][1]};
     }
     return {type: d.type, T, tx: d.at[0], ty: d.at[1], sx: d.at[0] + Math.cos(a) * 70, sy: d.at[1] + Math.sin(a) * 50 - 40, delay: d.delay,
       state: 'wait', t: 0, x: d.at[0], y: d.at[1], z: 900, vz: 0, p: -1, links: [], voice: null, kick: 0, buzzT: 0, impactT: -1, ang: a, fail: null};
@@ -2674,11 +3287,13 @@ function tearAround(x, y, R){
 function bugsUpdate(dt){
   testT += dt;
   for (const b of bugs){
-    if (b.state === 'wait'){ if (testT >= b.delay){ b.state = b.lane ? 'lane' : 'fly'; b.t = 0; b.voice = buzzStart(b.T.buzz); } continue; }
+    if (b.state === 'wait'){ if (testT >= b.delay){ b.state = b.lane ? 'lane' : b.orbit ? 'orbit' : 'fly'; b.t = 0; b.voice = buzzStart(b.T.buzz); } continue; }
     if (b.state === 'lane'){ laneUpdate(b, dt); continue; }
+    if (b.state === 'orbit'){ orbitUpdate(b, dt); continue; }
     if (b.state === 'caught'){ caughtUpdate(b, dt); continue; }
     if (b.state === 'fly'){
       b.t += dt;
+      if (b.node >= 0 && !DEAD[b.node]){ b.tx = X[b.node]; b.ty = Y[b.node]; }   // one coming in after the test makes for a thread, wherever the wind has it
       const u = clamp(b.t / b.T.approach, 0, 1), w = (1 - u) * (1 - u);
       b.x = lerp(b.sx, b.tx, easeOut(u)) + Math.sin(b.t * 17 + b.ang) * 6 * w;
       b.y = lerp(b.sy, b.ty, easeOut(u)) + Math.cos(b.t * 13 + b.ang) * 5 * w;
@@ -2790,6 +3405,7 @@ function stuckUpdate(b, dt){
   if (b.kick <= 0){ b.kick = FR(0.22, 0.55); PX[B] = X[B] - FR(-1, 1) * 0.8; PY[B] = Y[B] - FR(-1, 1) * 0.8; b.buzzT = 0.12; }
   b.buzzT = Math.max(0, b.buzzT - dt);
   if (phase === 'test') buzzSet(b.voice, b.buzzT > 0 ? 0.07 : 0, panOf(b.x));
+  else if (b.extra) buzzSet(b.voice, b.buzzT > 0 && since < 1.2 ? 0.05 : 0, panOf(b.x));   // caught while the spider rests: it struggles a moment, then is still
 }
 
 /* ---------- the passer-by ---------- */
@@ -3096,6 +3712,133 @@ function drawNet(P, t){
   brush(hoop, BR.strap, 1703, true);
   ctx.restore();
 }
+// someone putting up a flyer on the lamp post: the hand comes in flat with the sheet under it, slaps it on the post, and goes; the sheet stays
+const FLYER_W = 150, FLYER_H = 206;
+const FLYER_HIT = [[-226, -110], [-58, -110], [-50, -72], [130, -62], [330, -66], [330, 66], [130, 62], [-50, 61], [-58, 110], [-226, 110]];
+function flyerPose(t){
+  const A = stage.dz, bb = dz.bb, ty = clamp(bb.my, A.y0, A.y1), x1 = A.x + 142, x0 = VW + 360;
+  if (t < 0.42){ const u = smooth(t / 0.42); return {x: lerp(x0, x1, u), y: ty - 16 + Math.sin(u * Math.PI) * -22 + 16 * u, rot: lerp(0.12, 0, u), sc: 1, ty}; }
+  if (t < 0.62){ const k = Math.sin(clamp((t - 0.42) / 0.12, 0, 1) * Math.PI) * 0.035; return {x: x1, y: ty, rot: 0, sc: 1, fx: 1 - k, ty}; }
+  const u = easeIn(clamp((t - 0.62) / 0.33, 0, 1));
+  return {x: lerp(x1, x0 + 80, u), y: ty + 90 * u, rot: lerp(0, 0.25, u), sc: 1, ty, gone: true};
+}
+function drawFlyerSheet(cx, cy, rot, seed){
+  // the flyer: a red band with a fat headline, a little picture, lines of small print, tear-off tabs with a number along the bottom
+  ctx.save(); ctx.translate(cx, cy); ctx.rotate(rot);
+  const w = FLYER_W, h = FLYER_H, x0 = -w / 2, y0 = -h / 2, sheet = rectPts(x0, y0, x0 + w, y0 + h);
+  ctx.fillStyle = COL.flyer; ctx.fill(polyPath(sheet));
+  ctx.fillStyle = rgbaOf(COL.flyerInk, 0.92); ctx.fillRect(x0 + 8, y0 + 8, w - 16, 38);
+  ctx.fillStyle = rgbaOf(COL.paper, 0.95); for (let k = 0; k < 4; k++) ctx.fillRect(x0 + 16 + k * 31, y0 + 16, 24, 22);
+  ctx.fillStyle = rgbaOf(COL.flyerInk, 0.92); for (let k = 0; k < 4; k++) ctx.fillRect(x0 + 21 + k * 31, y0 + 21, 14, 12);
+  ctx.fillStyle = 'rgba(70,120,170,0.35)'; ctx.fillRect(x0 + 10, y0 + 54, 56, 44);
+  brush(rectPts(x0 + 10, y0 + 54, x0 + 66, y0 + 98), BR.fine, seed + 1, true, 0.7);
+  for (let k = 0; k < 5; k++) brush([[x0 + 74, y0 + 58 + k * 9], [x0 + w - 12 - (k % 2) * 14, y0 + 58 + k * 9]], BR.grain, seed + 2 + k, false, 0.8);
+  for (let k = 0; k < 4; k++) brush([[x0 + 12, y0 + 110 + k * 9], [x0 + w - 16 - (k % 3) * 20, y0 + 110 + k * 9]], BR.grain, seed + 8 + k, false, 0.7);
+  const tabs = 7, tw = (w - 8) / tabs, tY = y0 + h - 40;
+  brush([[x0 + 4, tY], [x0 + w - 4, tY]], BR.fine, seed + 13, false, 0.6);
+  for (let k = 0; k < tabs; k++){ const tx = x0 + 4 + k * tw; if (k) brush([[tx, tY], [tx, y0 + h]], BR.fine, seed + 14 + k, false, 0.5); brush([[tx + tw / 2, tY + 5], [tx + tw / 2, y0 + h - 5]], BR.grain, seed + 24 + k, false, 0.8); }
+  brush(sheet, BR.leaf, seed, true);
+  ctx.restore();
+}
+function drawFlyer(P, t){
+  const A = stage.dz;
+  if (t < 0.42) speedLines(P, flyerPose(Math.max(0, t - 0.05)), [[-226, -100], [-226, 0], [-226, 100], [-120, 110], [-120, -110]], 2010);
+  if (t >= 0.42) drawFlyerSheet(A.x, P.ty, 0.03, 2020);
+  if (t > 0.95) return;
+  ctx.save(); ctx.translate(P.x, P.y); ctx.rotate(P.rot); ctx.scale(P.sc * (P.fx || 1), P.sc);
+  if (t < 0.42) drawFlyerSheet(-142, 0, 0.03, 2020);
+  ctx.fillStyle = COL.paper; ctx.fill(polyPath(SLEEVE)); brush(SLEEVE, BR.strap, 2040, true);
+  for (let k = 0; k < 5; k++) brush([[150 + k * 34, -50 + hsh(k, 12) * 10], [168 + k * 34, 52 - hsh(k, 13) * 10]], BR.fine, 2041 + k, false, 0.6);
+  ctx.fillStyle = COL.paper; ctx.fill(polyPath(HAND)); brush(HAND, BR.strap, 2050, true);
+  brush([[-158, -23], [-62, -19]], BR.leaf, 2051, false); brush([[-168, 4], [-60, 3]], BR.leaf, 2052, false); brush([[-160, 28], [-62, 24]], BR.leaf, 2053, false);
+  ctx.restore();
+}
+function flyerSlap(){ thump(0.7); noiseHit(0.12, 4200, 2200, 0.8, 0.22); vib([25, 15, 20]); }
+// a bus going by on the road behind: the gust off its side tears through everything
+const BUS_L = 1900, BUS_V = 1750;
+const BUS_HIT = [[-40, -940], [560, -940], [560, 10], [-40, 10]];
+function busPose(t){ return {x: VW + 70 - BUS_V * t, y: GROUND, rot: 0, sc: 1}; }
+function drawBusBack(){
+  // the bus itself, behind everything in the picture: a long green side, windows, wheels
+  if (!dz || !dz.on || dz.kind !== 'bus') return;
+  const t = clock - dz.t0, x = VW + 70 - BUS_V * t, g = GROUND, top = g - 705;
+  if (x > VW + 80 || x + BUS_L < -80) return;
+  const body = roundRectPts(x, top, BUS_L, 650, 34);
+  ctx.fillStyle = COL.bus; ctx.fill(polyPath(body));
+  ctx.fillStyle = COL.busDeep; ctx.fillRect(x + 4, g - 175, BUS_L - 8, 70);
+  ctx.fillStyle = rgbaOf(COL.paper, 0.85); ctx.fillRect(x + 4, g - 105, BUS_L - 8, 14);
+  // the windscreen and the destination sign at the front, then the side windows and the doors
+  const ws = [[x + 10, top + 34], [x + 150, top + 34], [x + 150, top + 330], [x + 10, top + 360]];
+  ctx.fillStyle = COL.busWindow; ctx.fill(polyPath(ws)); brush(ws, BR.sign, 2101, true);
+  ctx.fillStyle = '#26282c'; ctx.fillRect(x + 22, top + 46, 116, 40); ctx.fillStyle = '#ffb42a'; for (let k = 0; k < 4; k++) ctx.fillRect(x + 32 + k * 26, top + 54, 18, 24);
+  for (let k = 0; k < 7; k++){
+    const wx = x + 210 + k * 236, win = roundRectPts(wx, top + 50, 206, 290, 12);
+    ctx.fillStyle = COL.busWindow; ctx.fill(polyPath(win));
+    ctx.fillStyle = 'rgba(255,255,255,0.55)'; ctx.fill(polyPath([[wx + 30, top + 60], [wx + 70, top + 60], [wx + 20, top + 330], [wx - 20 + 30, top + 330]]));
+    brush(win, BR.sign, 2110 + k, true);
+  }
+  for (const dx of [170, 980]){ const door = rectPts(x + dx, top + 50, x + dx + 120, g - 60); ctx.fillStyle = 'rgba(188,216,234,0.9)'; ctx.fill(polyPath(door)); brush(door, BR.sign, 2130 + dx, true); brush([[x + dx + 60, top + 50], [x + dx + 60, g - 60]], BR.leaf, 2131 + dx, false); }
+  brush(body, BR.strap, 2100, true);
+  for (const dx of [330, 1520]){
+    ctx.fillStyle = '#26282c'; ctx.beginPath(); ctx.arc(x + dx, g - 10, 72, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#9aa0a8'; ctx.beginPath(); ctx.arc(x + dx, g - 10, 32, 0, TAU); ctx.fill();
+    brush(ellipsePts(x + dx, g - 10, 72, 72, 26), BR.sign, 2140 + dx, true);
+    for (let k = 0; k < 5; k++){ const a = clock * -40 + k / 5 * TAU; brush([[x + dx, g - 10], [x + dx + Math.cos(a) * 28, g - 10 + Math.sin(a) * 28]], BR.fine, 2150 + dx + k, false, 0.8); }
+  }
+}
+function drawBusGust(P, t){
+  // in front of everything: the rush of air off the side of the bus, and dust and leaves going with it
+  const fx = P.x;
+  for (let k = 0; k < 22; k++){
+    const y = 120 + hsh(k, 41) * 660, x = fx + 40 + hsh(k, 42) * 520, len = 90 + hsh(k, 43) * 220;
+    brush([[x, y], [x + len, y + (hsh(k, 44) - 0.5) * 12]], BR.fine, 2200 + k, false, 0.55);
+  }
+  ctx.fillStyle = rgbaOf(COL.leafFall, 0.9);
+  for (let k = 0; k < 10; k++){ const x = fx + 60 + hsh(k, 45) * 480 - t * 300, y = 300 + hsh(k, 46) * 480 - Math.sin(t * 8 + k) * 30; ctx.beginPath(); ctx.ellipse(x, y, 5, 2.4, t * 12 + k, 0, TAU); ctx.fill(); }
+}
+function busSound(){
+  // a bus coming up the road: engine and tyres, louder and nearer, then going away
+  if (!auOK()) return;
+  const ac = AU.ctx, t = auNow() + 0.02, dur = 3.6, pk = t + STRIKE_T + 0.15;
+  const o = ac.createOscillator(); o.type = 'sawtooth'; o.frequency.setValueAtTime(46, t); o.frequency.linearRampToValueAtTime(52, pk); o.frequency.linearRampToValueAtTime(41, t + dur);
+  const og = nGain(0.0001), lp = nFilt('lowpass', 320, 0.8);
+  og.gain.setValueAtTime(0.0001, t); og.gain.exponentialRampToValueAtTime(0.12, pk); og.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  const s = nLoop(AU.brown, 0.9), sg = nGain(0.0001), sp2 = nFilt('lowpass', 700, 0.6);
+  sg.gain.setValueAtTime(0.0001, t); sg.gain.exponentialRampToValueAtTime(0.3, pk); sg.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  let out = nGain(1);
+  wire([o, lp, og]).connect(out); wire([s, sp2, sg]).connect(out);
+  if (ac.createStereoPanner){ const P = ac.createStereoPanner(); P.pan.setValueAtTime(0.9, t); P.pan.linearRampToValueAtTime(-0.9, t + dur); out.connect(P); out = P; }
+  out.connect(AU.master); o.start(t); s.start(t, rnd(0, 5)); o.stop(t + dur + 0.05); s.stop(t + dur + 0.05);
+  vib([10, 40, 14, 40, 18]);
+}
+function groundShake(k){
+  // the ground trembling as something heavy goes by: everything standing shivers, nothing is struck
+  objBase.forEach((bx, o) => { const s = objShake[o], ang = FR(0, TAU); s.amp = k * 2.2; s.t0 = clock; s.ax = Math.cos(ang); s.ay = Math.sin(ang) * 0.5; });
+}
+const APPROACH_BUS = [[0.0, () => busSound()], [0.8, () => groundShake(0.35)], [1.3, () => groundShake(0.7)]];
+// a long aluminium ladder carried past on someone's shoulder, swinging a little as they walk
+const LADDER_L = 760, LADDER_W = 46;
+const LADDER_HIT = [[-LADDER_L / 2, -LADDER_W / 2 - 4], [LADDER_L / 2, -LADDER_W / 2 - 4], [LADDER_L / 2, LADDER_W / 2 + 4], [-LADDER_L / 2, LADDER_W / 2 + 4]];
+function ladderPose(t){
+  const bb = dz.bb, u = clamp(t / 1.05, 0, 1);
+  return {x: lerp(VW + 440, -500, u), y: bb.my + Math.sin(u * TAU * 1.6) * 10 + 8, rot: lerp(-0.13, 0.09, u) + Math.sin(u * TAU * 1.6) * 0.03, sc: 1};
+}
+function drawLadder(P, t){
+  speedLines(P, ladderPose(Math.max(0, t - 0.05)), [[-LADDER_L / 2, -20], [-LADDER_L / 2, 20], [-200, 26], [100, 26], [-200, -26], [100, -26]], 2300);
+  ctx.save(); ctx.translate(P.x, P.y); ctx.rotate(P.rot);
+  const L = LADDER_L / 2, W = LADDER_W / 2;
+  for (const s of [1, -1]){
+    const rail = rectPts(-L, s * W - 5, L, s * W + 5);
+    ctx.fillStyle = COL.ladder; ctx.fill(polyPath(rail));
+    ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.fillRect(-L + 4, s * W - 3, LADDER_L - 8, 2);
+    brush(rail, BR.sign, 2310 + s, true);
+  }
+  for (let x = -L + 30; x < L - 10; x += 56){ const rung = rectPts(x - 4, -W + 5, x + 4, W - 5); ctx.fillStyle = '#a9b0b8'; ctx.fill(polyPath(rung)); brush(rung, BR.fine, 2320 + Math.round(x), true); }
+  for (const s of [1, -1]){ const foot = rectPts(-L - 14, s * W - 6, -L + 6, s * W + 6); ctx.fillStyle = '#2b2c30'; ctx.fill(polyPath(foot)); brush(foot, BR.fine, 2340 + s, true); }
+  ctx.fillStyle = 'rgba(244,194,31,0.95)'; ctx.fillRect(140, W - 4, 46, 8); brush(rectPts(140, W - 4, 186, W + 4), BR.fine, 2345, true);
+  ctx.restore();
+}
+function ladderClank(){ if (auOK()) clanks(auNow() + 0.01); noiseHit(0.2, 2600, 900, 0.9, 0.16); }
 // reach: how far (in its own units) any part of its outline is from its origin; cut: when it stops breaking threads;
 // carry: when it lets go of what it caught; grab: the share of the first-cut points it carries along; sub: extra checks per step for thin fast shapes
 const DZK = {
@@ -3109,7 +3852,10 @@ const DZK = {
   glove:    {pose: glovePose,    hit: GLOVE,     reach: 140,  cut: 0.8,  carry: 0.9,  end: 0.95, kick: -1, grab: 0.25, sub: 2, draw: (P, t) => drawGlove(P, t)},
   pack:     {pose: packPose,     hit: PACK,      reach: 120,  cut: 0.95, carry: 1.0,  end: 1.05, kick: -1, grab: 0.15, sub: 2, draw: (P, t) => drawPack(P, t)},
   splash:   {pose: splashPose,   hit: SPLASH,    reach: 340,  cut: 0.8,  carry: 0.85, end: 0.9,  kick: -1, grab: 0.1,  sub: 2, draw: (P, t) => drawSplash(P, t)},
-  net:      {pose: netPose,      hit: NET_HIT,   reach: 800,  cut: 0.72, carry: 0.8,  end: 0.85, kick: 1,  grab: 0.2,  sub: 3, draw: (P, t) => drawNet(P, t)}
+  net:      {pose: netPose,      hit: NET_HIT,   reach: 800,  cut: 0.72, carry: 0.8,  end: 0.85, kick: 1,  grab: 0.2,  sub: 3, draw: (P, t) => drawNet(P, t)},
+  flyer:    {pose: flyerPose,    hit: FLYER_HIT, reach: 380,  cut: 0.6,  carry: 0.75, end: 0.95, kick: -1, grab: 0.18, sub: 2, stays: true, land: 0.42, onLand: () => flyerSlap(), draw: (P, t) => drawFlyer(P, t)},
+  bus:      {pose: busPose,      hit: BUS_HIT,   reach: 1000, cut: 0.75, carry: 0.8,  end: 0.85, kick: -1, grab: 0.06, sub: 3, approach: APPROACH_BUS, draw: (P, t) => drawBusGust(P, t)},
+  ladder:   {pose: ladderPose,   hit: LADDER_HIT, reach: 400, cut: 1.0,  carry: 1.05, end: 1.1,  kick: -1, grab: 0.12, sub: 3, onStrike: () => ladderClank(), draw: (P, t) => drawLadder(P, t)}
 };
 function dzKind(){ return DZK[dz.kind] || DZK.hand; }
 function destroyerHits(x, y){
@@ -3158,7 +3904,7 @@ function destroyerStep(){
     return;
   }
   const K = dzKind();
-  if (K.land && !dz.landed && t >= K.land){ dz.landed = true; thump(0.9); noiseHit(0.3, 900, 160, 0.6, 0.32, 'lowpass'); vib([30, 20, 18]); }
+  if (K.land && !dz.landed && t >= K.land){ dz.landed = true; if (K.onLand) K.onLand(); else { thump(0.9); noiseHit(0.3, 900, 160, 0.6, 0.32, 'lowpass'); vib([30, 20, 18]); } }
   if (t > K.end) return;
   const P = K.pose(t), Pp = K.pose(Math.max(0, t - STEP)), subP = [];
   for (let k = 1; k < K.sub; k++) subP.push(K.pose(Math.max(0, t - STEP * k / K.sub)));
@@ -3200,10 +3946,12 @@ const APPROACH = [[0.0, () => footfall(-80, 0.35)], [0.55, () => footfall(70, 0.
 // or the wind getting up, gust on gust
 function storm(k){ stormK = k; noiseHit(1.5, 240, 600 + 700 * k, 0.5, 0.05 + 0.1 * k); }
 const APPROACH_WIND = [[0.0, () => storm(0.25)], [0.55, () => storm(0.45)], [1.1, () => storm(0.7)], [1.55, () => storm(0.95)]];
-function approachFor(){ return (DZK[stage.destroyer] || {}).wind ? APPROACH_WIND : APPROACH; }
+function approachFor(){ const K = DZK[stage.destroyer] || {}; return K.approach || (K.wind ? APPROACH_WIND : APPROACH); }
 function startSwipe(now){
-  // now: the footsteps were already heard while the spider went home, so the blow comes at once
+  // now: the footsteps were already heard while the spider went home or lived in its web, so the blow comes at once
   phase = 'swipe'; phaseT = now ? STRIKE_T : 0;
+  for (const b of bugs) if (b.extra && (b.state === 'wait' || b.state === 'fly')) b.state = 'gone';
+  birdsFlee();
   stopBuzzes();
   const bb = webBBox();
   const ev = [...(now ? [] : approachFor()), [STRIKE_T, () => { const K = dzKind(); if (K.onStrike) K.onStrike(); dz.on = true; dz.t0 = clock; noiseHit(0.5, 500, 3800, 0.6, 0.55); vib([40, 30, 25]); }]];
@@ -3220,30 +3968,359 @@ function swipeUpdate(){
   if (!dz.hitSpider && (destroyerHits(sp.x, sp.y) || t > 0.9)){ dz.hitSpider = true; startDestroyDrop(); }
 }
 
-/* ---------- after a clear: a little dance, home to the centre, and just as it gets there whoever is passing arrives ---------- */
+/* ---------- birds: brown-eared bulbuls (직박구리). in the persimmon tree they come for the last of the fruit and never look at the web;
+   at the very end one of them comes for the spider ---------- */
+// the bird in its own frame: facing +x, y down, the middle of its body at the origin; about 215 from the tip of the bill to the end of the tail
+const BIRD = (() => {
+  const body = closedCurve([[67, -27], [63, -39], [54, -46], [45, -48], [39, -42], [33, -29], [16, -24], [-6, -22], [-28, -16], [-42, -8],
+    [-44, 4], [-30, 14], [-6, 21], [16, 18], [33, 7], [46, -7], [57, -14], [66, -20]], 3);
+  // the darker cap, the chestnut patch behind the eye, the pale speckled underside, the wing folded along the side
+  const crown = closedCurve([[64, -38], [55, -46], [45, -49], [37, -44], [33, -31], [41, -35], [52, -37]], 3);
+  const cheek = closedCurve([[57, -25], [52, -18], [43, -15], [36, -20], [40, -27], [49, -29]], 3);
+  const belly = closedCurve([[45, -6], [30, 9], [8, 18], [-14, 19], [-29, 12], [-8, 11], [14, 6], [33, -4]], 3);
+  const bill = [[65, -30.5], [76, -30], [88, -26.8], [79, -23.4], [65, -20.5]];
+  const fold = closedCurve([[31, -19], [8, -23], [-20, -19], [-46, -10], [-74, -1], [-55, 5], [-28, 8], [-4, 7], [16, 1], [28, -8]], 3);
+  const r = mulberry32(5150), speck = [];
+  for (let k = 0; k < 20; k++){ const x = -24 + r() * 64, y = 4 + r() * 13 - Math.max(0, x - 18) * 0.5; speck.push([x, y, 0.6 + r() * 0.7]); }
+  return {body, crown, cheek, belly, bill, fold, speck};
+})();
+const BILL_TIP = [88, -26.8];
+function birdTail(fan){
+  // long, a little wider toward its square end; it fans right out when the bird brakes
+  return closedCurve([[-38, -9], [-80, -9 - 2 * fan], [-118, -11 - 12 * fan], [-128, -5 - 7 * fan], [-131, 2], [-128, 9 + 7 * fan], [-118, 15 + 12 * fan], [-80, 9 + 2 * fan], [-40, 6]], 3);
+}
+// a wing spread in flight, in its own terms: u out along it (a share of its length), v back across it.
+// the leading edge to the tip, then the trailing edge back, ragged where the long flight feathers are
+const WING_LE = [[0, -6], [0.24, -7.5], [0.48, -5], [0.74, 0], [1, 7]];
+const WING_TE = [[0.97, 14], [0.9, 18], [0.86, 23], [0.78, 22], [0.74, 28], [0.64, 27], [0.6, 32], [0.46, 33], [0.26, 32], [0, 27]];
+function birdWing(beta, L, root){
+  // beta: how far the wing is raised (up is positive). seen from the side, a wing held out toward the eye is short and a raised one long
+  // (seen from a little above, a wing held out toward the eye shows going down and back)
+  const c = Math.cos(beta), sx = (-0.32 - 0.12 * c) / 1.05, sy = (-Math.sin(beta) + 0.38 * c) / 1.05;
+  const at = ([u, v]) => [root[0] + sx * u * L - v, root[1] + sy * u * L + 0.12 * v];
+  return {pts: [...WING_LE.map(at), ...WING_TE.map(at)], feathers: WING_TE.slice(0, 8).map(([u, v]) => [at([u, v]), at([u * 0.92, v * 0.3])])};
+}
+function drawBird(B){
+  // B: x, y (the middle of the body), dir (1 faces right), sc, ang (nose down is positive), beta (a wing's raise, null when folded),
+  // fan (tail), legs ('tuck', 'reach' or 'perch'), alpha
+  ctx.save();
+  ctx.globalAlpha = B.alpha === undefined ? 1 : B.alpha;
+  ctx.translate(B.x, B.y); ctx.scale(B.dir * B.sc, B.sc); ctx.rotate(B.ang);
+  const flying = B.beta !== null && B.beta !== undefined;
+  const wingAt = (beta, root, col, seed, a) => {
+    const W = birdWing(beta, 98, root);
+    ctx.fillStyle = col; ctx.fill(polyPath(W.pts));
+    brush(W.pts, BR.leaf, seed, true, a);
+    W.feathers.forEach((f, k) => brush(f, BR.fine, seed + 1 + k, false, 0.55 * a));
+  };
+  // the far wing, behind the body and a little higher
+  if (flying) wingAt(B.beta + 0.14, [8, -24], '#4d535c', 5180, 0.9);
+  // the tail, swung down a little when perched
+  ctx.save(); ctx.translate(-38, -1); ctx.rotate(B.tailA || 0); ctx.translate(38, 1);
+  const tail = birdTail(B.fan || 0);
+  ctx.fillStyle = COL.birdDeep; ctx.fill(polyPath(tail));
+  brush(tail, BR.leaf, 5110, true);
+  for (let k = 0; k < 3; k++) brush([[-44, -1 + (k - 1) * 4], [-120, 2 + (k - 1) * (6 + 10 * (B.fan || 0))]], BR.fine, 5111 + k, false, 0.5);
+  ctx.restore();
+  // the body: grey, a paler speckled underside, a darker cap with a ragged crest, the chestnut patch on the cheek
+  const bodyP = polyPath(BIRD.body);
+  ctx.fillStyle = COL.bird; ctx.fill(bodyP);
+  ctx.save(); ctx.clip(bodyP);
+  ctx.fillStyle = COL.birdPale; ctx.fill(polyPath(BIRD.belly));
+  ctx.fillStyle = 'rgba(255,255,255,0.85)';
+  for (const [x, y, rr] of BIRD.speck){ ctx.beginPath(); ctx.ellipse(x, y, rr * 1.3, rr, -0.3, 0, TAU); ctx.fill(); }
+  ctx.fillStyle = '#737a85'; ctx.fill(polyPath(BIRD.crown));
+  ctx.restore();
+  ctx.fillStyle = COL.birdCheek; ctx.fill(polyPath(BIRD.cheek));
+  brush(BIRD.cheek, BR.fine, 5120, true, 0.7);
+  brush(BIRD.body, BR.sign, 5121, true);
+  for (let k = 0; k < 4; k++) brush([[38 + k * 4, -44 - (k % 2) * 2], [32 + k * 4, -51 - k * 0.6]], BR.fine, 5122 + k, false, 0.8);
+  if (!flying){
+    // the folded wing along the side, its long feathers crossing toward the tail
+    ctx.fillStyle = COL.birdDeep; ctx.fill(polyPath(BIRD.fold));
+    brush(BIRD.fold, BR.leaf, 5130, true);
+    for (let k = 0; k < 4; k++) brush([[-10 - k * 9, -14 + k * 3.5], [-58 - k * 3, -2 + k * 1.6]], BR.fine, 5131 + k, false, 0.6);
+    brush(catmull([[26, -12], [8, -11], [-12, -8]], 3), BR.fine, 5136, false, 0.5);
+  }
+  // the bill and the eye
+  ctx.fillStyle = '#2a2b2f'; ctx.fill(polyPath(BIRD.bill));
+  brush(BIRD.bill, BR.fine, 5140, true);
+  ctx.fillStyle = '#1b1b1d'; ctx.beginPath(); ctx.ellipse(56.5, -31, 3.1, 3.3, 0, 0, TAU); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,0.95)'; ctx.beginPath(); ctx.arc(55.6, -32.2, 0.95, 0, TAU); ctx.fill();
+  // the near wing over the body
+  if (flying) wingAt(B.beta, [12, -20], COL.birdDeep, 5150, 1);
+  // the legs: tucked up in flight, reaching out to land, gripping the twig
+  const leg = (pts, seed) => brush(pts, {...BR.leaf, cw: 1.5}, seed, false, 1, '#2f3034', 'rgba(47,48,52,0.6)');
+  if (B.legs === 'reach'){ for (const s of [0, 1]){ const dx = s * 5; leg([[6 + dx, 14], [16 + dx, 27], [26 + dx, 33]], 5160 + s); leg([[26 + dx, 33], [33 + dx, 31]], 5162 + s); leg([[26 + dx, 33], [30 + dx, 38]], 5164 + s); } }
+  else if (B.legs === 'perch'){ for (const s of [0, 1]){ const dx = s * 7 - 2; leg([[4 + dx, 16], [8 + dx, 29], [5 + dx, 38]], 5166 + s); leg([[5 + dx, 38], [14 + dx, 39], [17 + dx, 42]], 5168 + s); leg([[5 + dx, 38], [-3 + dx, 40]], 5170 + s); } }
+  else leg([[2, 17], [-10, 21]], 5172);
+  ctx.restore();
+}
+function billAt(B){
+  // where the tip of the bill is, in the picture
+  const c = Math.cos(B.ang), s = Math.sin(B.ang), x = BILL_TIP[0] * c - BILL_TIP[1] * s, y = BILL_TIP[0] * s + BILL_TIP[1] * c;
+  return [B.x + B.dir * B.sc * x, B.y + B.sc * y];
+}
+function bulbulCall(pan, vol){
+  // a bulbul's call: a loud, rough, squealing whistle, then a shorter one
+  if (!auOK()) return;
+  const ac = AU.ctx, t = auNow() + 0.02, g0 = nGain(1);
+  nPan(g0, pan).connect(AU.master);
+  const note = (ts, f0, f1, f2, d, v) => {
+    const o = ac.createOscillator(); o.type = 'sawtooth';
+    o.frequency.setValueAtTime(f0, ts); o.frequency.linearRampToValueAtTime(f1, ts + d * 0.35); o.frequency.exponentialRampToValueAtTime(f2, ts + d);
+    const lfo = ac.createOscillator(), dep = nGain(f1 * 0.04); lfo.frequency.value = 36; lfo.connect(dep); dep.connect(o.frequency);
+    const bp = nFilt('bandpass', 2900, 2.2), e = nGain(0.0001);
+    e.gain.setValueAtTime(0.0001, ts); e.gain.exponentialRampToValueAtTime(v, ts + 0.015); e.gain.setValueAtTime(v * 0.8, ts + d * 0.6); e.gain.exponentialRampToValueAtTime(0.0001, ts + d);
+    o.connect(bp); bp.connect(e); e.connect(g0); o.start(ts); lfo.start(ts); o.stop(ts + d + 0.03); lfo.stop(ts + d + 0.03);
+  };
+  note(t, 2300, 3500, 2500, 0.3, vol);
+  note(t + 0.38, 3100, 3300, 2200, 0.16, vol * 0.8);
+}
+function flutter(pan, dur, vol){
+  // wingbeats: soft rushes of air, many a second
+  if (!auOK()) return;
+  const ac = AU.ctx, t = auNow() + 0.01, s = ac.createBufferSource(); s.buffer = AU.noise;
+  const bp = nFilt('bandpass', 1100, 0.7), am = nGain(0.5), lfo = ac.createOscillator(), dep = nGain(0.5), g = nGain(0.0001);
+  lfo.type = 'triangle'; lfo.frequency.value = 15; lfo.connect(dep); dep.connect(am.gain);
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.06); g.gain.setValueAtTime(vol, t + dur * 0.7); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  s.connect(bp); bp.connect(am); am.connect(g); nPan(g, pan).connect(AU.master);
+  s.start(t, Math.random()); lfo.start(t); s.stop(t + dur + 0.05); lfo.stop(t + dur + 0.05);
+}
+let birds = [], birdNext = 99, birdToast = false, objDip = [], snatch = null;
+const END_WAIT = 3.6;   // how long the empty picture stays before the button comes
+function bezier(p0, p1, p2, u){ const a = (1 - u) * (1 - u), b = 2 * (1 - u) * u, c = u * u; return [a * p0[0] + b * p1[0] + c * p2[0], a * p0[1] + b * p1[1] + c * p2[1]]; }
+function flightTo(from, to, lift, speed){
+  // a curved flight: it dips and comes up into a perch, or climbs away
+  const d = Math.hypot(to[0] - from[0], to[1] - from[1]);
+  return {p0: from.slice(), p1: [(from[0] + to[0]) / 2, (from[1] + to[1]) / 2 + lift], p2: to.slice(), T: Math.max(0.42, d / speed)};
+}
+/* the twigs the birds come to: each swings about where it leaves the branch, sags while a bird sits on it and springs back after */
+function dipXf(d){ const o = objDip[d.o]; return {x: 0, y: 0, a: o ? o.a : 0, px: d.px, py: d.py}; }
+function dipPoint(d, p){ return applyXf(dipXf(d), p[0], p[1]); }
+function dipUpdate(dt){
+  for (const o of objDip){
+    if (!o) continue;
+    o.v += (-80 * (o.a - o.tgt) - 7 * o.v) * dt; o.a += o.v * dt;
+  }
+}
+function shakeOff(o){
+  // a bird landing on a twig: whatever is fastened to the twig comes off
+  let any = false;
+  for (const ch of CHAINS){
+    if (ch.dead) continue;
+    const n = ch.nodes, last = n.length - 1;
+    if (OBJ[n[0]] === o && PIN[n[0]] && !CB[ch.cons[0]]){ breakC(ch.cons[0]); any = true; }
+    if (OBJ[n[last]] === o && PIN[n[last]] && !CB[ch.cons[last - 1]]){ breakC(ch.cons[last - 1]); any = true; }
+  }
+  if (any && (phase === 'build' || phase === 'test') && !birdToast){ birdToast = true; toast('새가 앉으면서 가지가 휘청해서, 거기 건 줄이 떨어졌어요. 새가 앉는 가지에는 걸지 마세요.', 4.5); }
+}
+function linesOnDips(){
+  // line ends still fastened to a twig the birds come to
+  const D = stageInfo.dips; if (!D) return 0;
+  const set = new Set(D.map(d => d.o)); let n = 0;
+  for (const ch of CHAINS){
+    if (ch.dead) continue;
+    const a = ch.nodes[0], b = ch.nodes[ch.nodes.length - 1];
+    if (PIN[a] && set.has(OBJ[a]) && !CB[ch.cons[0]]) n++;
+    if (PIN[b] && set.has(OBJ[b]) && !CB[ch.cons[ch.cons.length - 1]]) n++;
+  }
+  return n;
+}
+function perchFree(k){ const d = stageInfo.dips[k], p = dipPoint(d, d.perch); return Math.hypot(p[0] - sp.x, p[1] - sp.y) > 56; }
+const BIRD_SC = 0.74;
+function perchBody(d, sc){
+  // sitting on the twig over the fruit, facing it: the feet where the twig is, the middle of the body above them
+  const P = dipPoint(d, d.perch), F = dipPoint(d, d.fruit), dir = F[0] >= P[0] ? 1 : -1;
+  return {x: P[0] - dir * 2 * sc, y: P[1] - 38 * sc, dir};
+}
+function startVisit(seq, from){
+  // a bird comes in, sits on each of these twigs in turn pecking at the fruit, and goes
+  seq = seq.filter(perchFree); if (!seq.length) return false;
+  const Q = perchBody(stageInfo.dips[seq[0]], BIRD_SC);
+  const start = from || [Math.random() < 0.5 ? -170 : VW + 170, rnd(30, 170)];
+  birds.push({state: 'in', seq, k: 0, F: flightTo(start, [Q.x, Q.y], 70, 430), t: 0, x: start[0], y: start[1], dir: Q.x > start[0] ? 1 : -1, ang: 0, beta: 0.6, fan: 0, legs: 'tuck',
+    sc: BIRD_SC, flap: Math.random() * TAU, stay: 0, peckT: 0, peckA: 0, called: false});
+  return true;
+}
+function perchPose(B, d){ const Q = perchBody(d, B.sc); B.x = Q.x; B.y = Q.y; B.dir = Q.dir; }
+function birdUpdate(B, dt){
+  B.t += dt;
+  const D = stageInfo.dips || [];
+  if (B.state === 'perch'){
+    const d = D[B.seq[B.k]];
+    perchPose(B, d);
+    B.beta = null; B.fan = 0.1; B.legs = 'perch'; B.tailA = 0.18;
+    // pecking at the fruit: a quick bob down, and bits of it flying
+    B.peckT -= dt; B.peckA = Math.max(0, B.peckA - dt * 5);
+    if (B.peckT <= 0){
+      B.peckT = rnd(0.42, 0.85); B.peckA = 1;
+      const F = dipPoint(d, d.fruit);
+      for (let k = 0; k < 2; k++) bits.push({x: F[0] + rnd(-6, 6), y: F[1] + rnd(-4, 6), vx: rnd(-30, 30), vy: rnd(-40, 10), kind: 'fruit', t0: clock, land: -1});
+      noiseHit(0.035, 3400, 1800, 1.5, 0.05);
+      const o = objDip[d.o]; if (o) o.v += (d.sign || 1) * 0.5;
+    }
+    B.ang = -0.12 + 0.62 * Math.sin(B.peckA * Math.PI * 0.5);
+    if (B.t >= B.stay){
+      const o = objDip[d.o]; if (o){ o.tgt = 0; o.v -= (d.sign || 1) * 1.7; }
+      flutter(panOf(B.x), 0.5, 0.05);
+      if (B.k + 1 < B.seq.length && perchFree(B.seq[B.k + 1])){
+        B.k++; const Q = perchBody(D[B.seq[B.k]], B.sc);
+        B.state = 'hop'; B.t = 0; B.F = flightTo([B.x, B.y], [Q.x, Q.y], -45, 300);
+      } else {
+        const ex = [B.dir > 0 ? VW + 190 : -190, rnd(-40, 120)];
+        B.state = 'out'; B.t = 0; B.F = flightTo([B.x, B.y], ex, 40, 460);
+      }
+    }
+    return;
+  }
+  // flying: along the curve, wings beating; coming in to land it brakes, wings up and tail spread, feet reaching
+  const landing = B.state === 'in' || B.state === 'hop';
+  if (landing){ const Q = perchBody(D[B.seq[B.k]], B.sc); B.F.p2 = [Q.x, Q.y]; }
+  const u = clamp(B.t / B.F.T, 0, 1), e = landing ? 1 - Math.pow(1 - u, 2) : Math.pow(u, 1.5);
+  const p = bezier(B.F.p0, B.F.p1, B.F.p2, e), vx = p[0] - B.x, vy = p[1] - B.y;
+  B.x = p[0]; B.y = p[1];
+  if (Math.abs(vx) > 0.3) B.dir = vx > 0 ? 1 : -1;
+  B.flap += dt * TAU * (B.state === 'out' ? 8 : 7);
+  const beat = 0.2 + 1.0 * Math.cos(B.flap + 0.35 * Math.sin(B.flap));
+  const flare = landing ? smooth((u - 0.68) / 0.3) : 0;
+  B.beta = lerp(beat, 1.35, flare); B.fan = flare; B.legs = flare > 0.3 ? 'reach' : 'tuck'; B.tailA = 0;
+  B.ang = lerp(clamp(Math.atan2(vy, Math.abs(vx) + 1e-6) * 0.6, -0.5, 0.5), -0.45, flare);
+  if (!B.called && B.state === 'in' && u > 0.25){ B.called = true; bulbulCall(panOf(B.x), 0.05); }
+  if (u >= 1){
+    if (B.state === 'out'){ B.state = 'gone'; return; }
+    // down on the twig: it dips under the bird, and anything fastened to it is shaken off
+    const d = D[B.seq[B.k]], o = objDip[d.o];
+    if (o){ o.v += (d.sign || 1) * 3.2; o.tgt = (d.sign || 1) * 0.26; }
+    shakeOff(d.o);
+    noiseHit(0.16, 2400, 900, 0.7, 0.07);
+    B.state = 'perch'; B.t = 0; B.stay = B.seq.length > 1 ? 0.75 : rnd(2.2, 3.4); B.peckT = 0.25;
+  }
+}
+function birdsUpdate(dt){
+  dipUpdate(dt);
+  if (stageInfo && stageInfo.dips && (phase === 'build' || phase === 'test')){
+    // now and then a bird comes for the persimmons while the web is being made
+    if (phase === 'build' && !birds.length && (birdNext -= dt) <= 0){
+      birdNext = rnd(13, 20);
+      const D = stageInfo.dips, k = Math.floor(Math.random() * D.length), seq = [k];
+      if (Math.random() < 0.45){ const j = (k + 1 + Math.floor(Math.random() * (D.length - 1))) % D.length; seq.push(j); }
+      startVisit(seq);
+    }
+  }
+  for (const B of birds){ if (B.state === 'show') continue; B.state === 'snatch' ? snatchUpdate(B, dt) : birdUpdate(B, dt); }
+  if (birds.some(B => B.state === 'gone')) birds = birds.filter(B => B.state !== 'gone');
+}
+function birdsFlee(){
+  // something big comes by: any bird in the tree is off at once
+  for (const B of birds){
+    if (B.state === 'snatch' || B.state === 'gone') continue;
+    if (B.state === 'perch'){ B.seq.length = B.k + 1; B.t = B.stay; }
+    else if (B.state === 'in' || B.state === 'hop'){ B.state = 'out'; B.t = 0; B.F = flightTo([B.x, B.y], [B.dir > 0 ? VW + 190 : -190, rnd(-40, 80)], 30, 520); }
+  }
+}
+function testVisit(){
+  // while the bugs come, a bird goes round every persimmon there is, one after another
+  birds = birds.filter(B => B.state === 'snatch');
+  const D = stageInfo.dips; if (!D) return;
+  const seq = D.map((d, k) => k).sort((a, b) => D[b].perch[0] - D[a].perch[0]);
+  startVisit(seq, [VW + 170, 60]);
+}
+/* the end: on the last stage, after the web is gone, one comes down and takes the spider */
+function startSnatch(){
+  const from = [VW + 200, -70];
+  snatch = {state: 'snatch', step: 'in', t: 0, x: from[0], y: from[1], dir: -1, ang: 0.3, beta: 0.6, fan: 0, legs: 'tuck', sc: 0.9, flap: 0, F: null, from};
+  birds.push(snatch);
+  bulbulCall(0.75, 0.07);
+}
+function snatchUpdate(B, dt){
+  B.t += dt;
+  if (B.step === 'in'){
+    // a short wait off to the right after its call, then down in one swoop to wherever the spider is hanging
+    if (B.t < 0.55) return;
+    const T = 0.8, u = clamp((B.t - 0.55) / T, 0, 1);
+    const bx = BILL_TIP[0] * B.sc, by = BILL_TIP[1] * B.sc;
+    const aim = [sp.x + bx, Math.min(GROUND - 30, sp.y - by - 4)];   // facing left: the bill is on the left of the body
+    if (!B.F){ B.F = {p0: B.from, p1: [lerp(B.from[0], aim[0], 0.5) + 60, aim[1] - 40]}; flutter(0.6, 1.0, 0.07); }
+    const e = 1 - Math.pow(1 - u, 2.4), p = bezier(B.F.p0, B.F.p1, aim, e);
+    const vx = p[0] - B.x, vy = p[1] - B.y;
+    B.x = p[0]; B.y = p[1];
+    B.dir = -1;
+    B.flap += dt * TAU * 6;
+    const flare = smooth((u - 0.7) / 0.3);
+    B.beta = lerp(u < 0.45 ? 0.95 : 0.2 + Math.cos(B.flap), 1.4, flare); B.fan = flare; B.legs = flare > 0.4 ? 'reach' : 'tuck';
+    B.ang = lerp(clamp(Math.atan2(vy, Math.abs(vx) + 1e-6) * 0.7, -0.4, 0.6), -0.2, flare);
+    if (u >= 1){ B.step = 'grab'; B.t = 0; takeSpider(B); }
+    return;
+  }
+  if (B.step === 'grab'){
+    // a beat holding still in the air, then off and up and away to the left
+    B.flap += dt * TAU * 9;
+    B.beta = 0.25 + 1.05 * Math.cos(B.flap); B.fan = 1 - smooth(B.t / 0.3); B.legs = 'tuck';
+    B.ang = lerp(-0.2, -0.35, smooth(B.t / 0.25));
+    if (B.t > 0.28){ B.step = 'out'; B.t = 0; B.F = {p0: [B.x, B.y], p1: [B.x - 160, B.y + 30], p2: [-260, -150]}; flutter(-0.2, 1.2, 0.08); }
+    return;
+  }
+  if (B.step === 'out'){
+    const u = clamp(B.t / 1.25, 0, 1), p = bezier(B.F.p0, B.F.p1, B.F.p2, Math.pow(u, 1.35));
+    const vx = p[0] - B.x, vy = p[1] - B.y;
+    B.x = p[0]; B.y = p[1];
+    B.flap += dt * TAU * 8.5;
+    B.beta = 0.2 + 1.05 * Math.cos(B.flap + 0.35 * Math.sin(B.flap)); B.fan = 0; B.legs = 'tuck';
+    B.ang = clamp(Math.atan2(vy, Math.abs(vx) + 1e-6) * 0.6, -0.5, 0.3);
+    if (u >= 1){ B.step = 'done'; B.state = 'gone'; sp.state = 'gone'; snatch = null; phase = 'end'; phaseT = 0; }
+  }
+}
+function takeSpider(B){
+  // the dragline parts; the spider hangs from the bill, legs going
+  if (sp.hang && sp.hang.top >= 0 && !DEAD[sp.hang.top]){
+    const top = sp.hang.top, s = spinneret(), pts = [];
+    for (let k = 0; k <= 10; k++) pts.push([lerp(X[top], s[0], k / 10), lerp(Y[top], s[1], k / 10)]);
+    addLoose(pts, true);
+  }
+  sp.hang = null; sp.lay = null; sp.state = 'taken'; sp.c = -1;
+  for (const lg of sp.legs) unplant(lg);
+  pluck(1400, 0.16, panOf(sp.x)); noiseHit(0.08, 1600, 600, 0.9, 0.12, 'lowpass');
+}
+function takenUpdate(){
+  // held by the middle in the bill, hanging head up, swinging as the bird beats its wings
+  if (!snatch) return;
+  const b = billAt(snatch), sw = Math.sin(clock * 9) * 0.22;
+  sp.h = -Math.PI / 2 + sw;
+  sp.x = b[0] - Math.cos(sp.h) * 6 * SPS; sp.y = b[1] - Math.sin(sp.h) * 6 * SPS; sp.z = 0;
+}
+function drawBirds(){ for (const B of birds) if (B.state !== 'gone') drawBird(B); }
+
+/* ---------- after a clear: a little dance, home to the centre, and whoever is passing arrives: just as it gets there, or after a few seconds of living in its web ---------- */
 const HOP_T = 0.46, CHEER_T = 2.3, HOME_V = SPEED * 0.62, AFTER_HOME = 0.3;
+// how long it gets in its web is different every time: one time in three none at all (the blow comes as it gets home), otherwise up to five seconds
+const LIVE_NONE = 1 / 3, LIVE_MIN = 0.5, LIVE_MAX = 4.7;
 let clr = null;
 function startClear(){
   phase = 'clear'; phaseT = 0;
   for (const b of bugs) if (b.state === 'stuck') buzzSet(b.voice, 0, 0);
-  clr = {step: 'cheer', t: 0, T: 0, hops: 0, path: null, k: 0, home: false, ev: [], strike: 0};
-  // the way home is known now (the dance is on the spot), so the footsteps can be timed to land the blow just after it arrives
+  clr = {step: 'cheer', t: 0, T: 0, hops: 0, path: null, k: 0, home: false, ev: [], strike: 0, gust: 0, calm: 0};
+  // the way home is known now (the dance is on the spot), so the footsteps can be timed to land the blow just after it arrives, or that much later
   const onWeb = sp.state === 'walk' && isWalk(sp.c);
   let walk = 0;
   if (onWeb && hubNode >= 0 && !DEAD[hubNode] && walkDeg(hubNode) > 0){
     const P = pathTo(hubNode, 330);
     if (P){ clr.path = P; walk = pathLen(P) / HOME_V; }
   }
-  const dance = onWeb ? CHEER_T : 0.3;
-  clr.strike = dance + walk + AFTER_HOME;
-  // footsteps only after the dance; with a short walk home there are fewer of them, the nearest and loudest
-  clr.ev = approachFor().map(e => [clr.strike - STRIKE_T + e[0], e[1]]).filter(e => e[0] >= dance - 0.05).map(e => ({t: e[0], fn: e[1], done: false}));
+  const dance = onWeb ? CHEER_T : 0.3, live = onWeb && Math.random() >= LIVE_NONE ? rnd(LIVE_MIN, LIVE_MAX) : 0;
+  // footsteps only after the dance; with a short walk home and no time in the web there are fewer of them, the nearest and loudest
+  strikeAt(dance + walk + AFTER_HOME + live, dance - 0.05);
 }
 function pathLen(P){
   const a = CI[sp.c], b = CJ[sp.c], L = Math.hypot(X[b] - X[a], Y[b] - Y[a]);
   let s = (P[0] === a ? sp.t : 1 - sp.t) * L;
   for (let i = 1; i < P.length; i++) s += Math.hypot(X[P[i]] - X[P[i - 1]], Y[P[i]] - Y[P[i - 1]]);
   return s;
+}
+function strikeAt(t, from){
+  // the blow at t, with the footsteps (or the wind getting up) before it, those from `from` on
+  clr.strike = t;
+  clr.ev = approachFor().map(e => [t - STRIKE_T + e[0], e[1]]).filter(e => e[0] >= from).map(e => ({t: e[0], fn: e[1], done: false}));
 }
 function endCheer(){ sp.cheer = 0; sp.hop = 0; sp.hopW = 1; sp.wag = 0; }
 function underLen(){ const c = sp.c; return c >= 0 && CCH[c] >= 0 ? CHAINS[CCH[c]].cost : 120; }
@@ -3252,8 +4329,9 @@ function clearUpdate(dt){
   for (const e of C.ev) if (!e.done && C.T >= e.t){ e.done = true; e.fn(); }
   if (C.T >= C.strike){ endCheer(); startSwipe(true); return; }
   if (sp.state !== 'walk' || !isWalk(sp.c)){
-    // knocked loose during the test: no dance
+    // knocked loose: no dance; knocked loose while it lives in its web, whoever is passing comes at once rather than leave it hanging there
     endCheer();
+    if (C.step === 'rest' && C.strike - C.T > AFTER_HOME * 2 + 0.5) strikeAt(C.T + AFTER_HOME * 2, C.T);
     if (sp.state === 'drop') dropUpdate(dt);
     else if (sp.state === 'walk') startDestroyDrop();
     return;
@@ -3271,9 +4349,49 @@ function clearUpdate(dt){
   else {
     // at rest; in the centre it turns head down like a real one
     sp.moving = false; sp.idleT += dt; if (C.home) turnTo(Math.PI / 2, dt, 2.2); settle(dt);
+    // a gust gets up and the frame threads hum, then it drops again
+    if (C.gust > 0 && C.T >= C.gust){ C.gust = 0; C.calm = C.T + 1.2; stormK = 0.22; noiseHit(1.6, 260, 760, 0.5, 0.045); strum(0.03, true); strumCD = 2.4; }
+    if (C.calm > 0 && C.T >= C.calm){ C.calm = 0; stormK = 0; }
   }
 }
-function toRest(){ clr.step = 'rest'; clr.t = 0; clr.path = null; strum(0.032, true); strumCD = 2.4; }
+function toRest(){
+  clr.step = 'rest'; clr.t = 0; clr.path = null; strum(0.032, true); strumCD = 2.4;
+  // when it has time in its web before the footsteps: a gust gets up and the threads hum, and now and then a bug or two flies in and sticks
+  const quiet = clr.strike - STRIKE_T - clr.T;
+  if (quiet > 1.9) clr.gust = clr.T + rnd(0.6, quiet - 1.3);
+  restBugs(clr.strike - clr.T - 1);
+}
+function restBugs(room){
+  // one of the kinds that came in the test (not a wasp, nothing heavy), at a spot on the sticky silk; sometimes a second one after it.
+  // room: the time there is for it to fly in and stick, a second before the blow
+  const kinds = [...new Set(stage.bugs.filter(d => !BUGT[d.type].lane && !BUGT[d.type].orbit && !BUGT[d.type].heavy).map(d => d.type))];
+  if (!kinds.length) kinds.push('fly');
+  let at = rnd(0.3, 0.9);
+  for (let k = 0; k < 2; k++){
+    if (Math.random() > (k ? 0.35 : 0.7)) break;
+    const type = kinds[Math.floor(Math.random() * kinds.length)], T = BUGT[type];
+    if (at + T.approach > room) break;
+    const node = restSpot(); if (node < 0) break;
+    const a = Math.random() * TAU;
+    bugs.push({type, T, tx: X[node], ty: Y[node], node, sx: X[node] + Math.cos(a) * 70, sy: Y[node] + Math.sin(a) * 50 - 40, delay: testT + at,
+      state: 'wait', t: 0, x: X[node], y: Y[node], z: 900, vz: 0, p: -1, links: [], voice: null, kick: 0, buzzT: 0, impactT: -1, ang: a, fail: null, extra: true});
+    at += rnd(0.7, 1.4);
+  }
+}
+function restSpot(){
+  // a point on the sticky silk, away from the spider and from the bugs already in the web
+  const out = [];
+  for (const ch of CHAINS){
+    if (ch.dead || ch.snapped || ch.type !== 'sticky') continue;
+    for (let k = 1; k < ch.nodes.length - 1; k++){
+      const n = ch.nodes[k];
+      if (DEAD[n] || Math.hypot(X[n] - sp.x, Y[n] - sp.y) < 34) continue;
+      if (bugs.some(b => { const bx = b.p >= 0 ? X[b.p] : b.tx, by = b.p >= 0 ? Y[b.p] : b.ty; return Math.hypot(bx - X[n], by - Y[n]) < 26; })) continue;
+      out.push(n);
+    }
+  }
+  return out.length ? out[Math.floor(Math.random() * out.length)] : -1;
+}
 function pathTo(goal, maxCost){
   // the cheapest way along the lines from where the spider stands; the sticky rings cost more, so it keeps to the spokes
   const n = X.length, dist = new Float64Array(n).fill(Infinity), prev = new Int32Array(n).fill(-1), hp = [];
@@ -3368,7 +4486,7 @@ function toggleMode(){
 }
 function modeName(){ return mode === 'drag' ? '뼈대실' : '끈끈이실'; }
 function undo(){
-  if (phase !== 'build') return;
+  if (phase !== 'build' || sp.state === 'fall') return;
   if (sp.state === 'cast'){ sp.cast = null; sp.state = 'walk'; return; }
   if (sp.state === 'spiral'){
     // If no ring segment or fastening split exists yet, ending the animation must not undo the web built before it.
@@ -3430,7 +4548,7 @@ function restoreSnap(s){
   for (let c = 0; c < s.m; c++) CB[c] = s.CB[c];
   CHAINS.forEach((ch, k) => { ch.snapped = s.snapped[k]; });
   silkLeft = s.silk;
-  sp.state = 'walk'; sp.lay = null; sp.cast = null; sp.spi = null; sp.hang = null;
+  sp.state = 'walk'; sp.lay = null; sp.cast = null; sp.spi = null; sp.hang = null; sp.fall = null;
   sp.c = s.spc; sp.t = s.spt; sp.h = s.sph; sp.lastMove = s.splm.slice(); sp.moving = false;
   if (isWalk(sp.c)){
     const p = edgePos(); sp.x = p[0]; sp.y = p[1]; sp.z = p[2]; sp.ox = p[0]; sp.oy = p[1]; sp.vx = 0; sp.vy = 0;
@@ -3440,7 +4558,9 @@ function restoreSnap(s){
   if (!isWalk(sp.c)) relocate();
 }
 function settleSpider(){
-  // whatever the spider is in the middle of is finished or dropped first
+  // whatever the spider is in the middle of is finished or dropped first (a fall is played out to where it lands)
+  for (let k = 0; sp.state === 'fall' && k < 600; k++) fallUpdate(STEP);
+  if (sp.state === 'fall') relocate();
   if (sp.state === 'cast'){ sp.cast = null; sp.state = 'walk'; }
   if (sp.state === 'spiral') endSpiral();
   if (sp.state === 'hang'){ const top = sp.hang.top; sp.hang = null; sp.state = 'walk'; placeOn(top); }
@@ -3456,7 +4576,7 @@ function putBackStage(k){
   ({X, Y, Z, PX, PY, PZ, BX, BY, PIN, OBJ, DEAD, FX, FY, INV, KIND, STK, SO, SN, ADJ, CI, CJ, CR, CB, CK, CCH, CW, CHAINS, UNDO,
     stageInfo, worldArt, objBase, objShake, objSway, hiddenObj, peelT, peelToast, laneHot, heavySeen, drips, dripToast, splashes,
     gustBoost, stormK, stageTries, buildT, silkLeft, mode, stats, sp, hubNode} = k);
-  preview = null; previewT = 0; hubT = 0.25; laneT = 0; snapShow = -1; silkFlash = 0;
+  preview = null; previewT = 0; hubT = 0.25; laneT = 0; snapShow = -1; silkFlash = 0; loose = [];
   prevIn.lay = false; prevIn.cast = false; held.lay = false; held.cast = false; latch.lay = false; latch.cast = false;
   for (const lg of sp.legs) unplant(lg);
   rebuildHash();
@@ -3521,7 +4641,9 @@ function loadStage(i){
   silkLeft = stage.budget; mode = 'drag'; preview = null; previewT = 0; hubNode = -1; hubT = 0; silkFlash = 0;
   phase = 'build'; phaseT = 0; bugs = []; result = null; snap = null; testBroken = 0; dz = null; shadowT0 = -9; impacts = []; toastT = 0;
   grav = 170; damp = 0.992; wreckWind = 0;
-  clr = null; glints = []; bits = []; quakeReset(); ambReset(); strumCD = rnd(5, 9);
+  clr = null; glints = []; bits = []; loose = []; slipCool = rnd(5, 10); quakeReset(); ambReset(); strumCD = rnd(5, 9);
+  birds = []; snatch = null; birdToast = false; birdNext = rnd(5, 8); orbitHot = []; objDip = [];
+  for (const d of stageInfo.dips || []) objDip[d.o] = {a: 0, v: 0, tgt: 0, px: d.px, py: d.py};
   if (AU.amb && auOK()) AU.amb.cg.gain.setTargetAtTime(0, auNow(), 0.6);
   stats = {bridges: 0, drops: 0, lays: 0, sticky: 0, crossed: false};
   prevIn.lay = false; prevIn.cast = false; held.lay = false; held.cast = false; latch.lay = false; latch.cast = false;
@@ -3546,6 +4668,7 @@ function startTest(){
   quake = null;   // the ground is still while the bugs come: a test is never decided by a tremor
   phase = 'test'; phaseT = 0; testT = 0; testBroken = 0; lastImpact = -1;
   bugs = makeBugs();
+  if (stageInfo.dips) testVisit();
 }
 function evaluate(){
   const need = bugs.filter(b => !b.lane), caught = need.filter(b => b.state === 'stuck').length, torn = bugs.some(b => b.lane && b.fail);
@@ -3556,11 +4679,16 @@ function evaluate(){
   pluck(196, 0.24);
   for (const b of bugs) if (b.state === 'stuck') buzzSet(b.voice, 0, 0);
 }
-function retry(){ resetGameplayInput(); stopBuzzes(); bugs = []; if (snap) restoreSnap(snap); snap = null; result = null; phase = 'build'; phaseT = 0; }
+function retry(){
+  resetGameplayInput(); stopBuzzes(); bugs = []; if (snap) restoreSnap(snap); snap = null; result = null; phase = 'build'; phaseT = 0;
+  birds = []; birdNext = rnd(8, 12); for (const o of objDip) if (o){ o.a = 0; o.v = 0; o.tgt = 0; }
+}
 function nextStage(){
-  if (cleared.size >= STAGES.length){ phase = 'end'; phaseT = 0; return; }
+  // on to the next stage not yet cleared; with all of them cleared, simply the next one (the last stage ends the game in its own way)
   const k = STAGES.findIndex((s, i) => i > stageIdx && !cleared.has(s.id));
-  loadStage(k >= 0 ? k : firstUncleared());
+  if (k >= 0){ loadStage(k); return; }
+  const f = firstUncleared();
+  loadStage(f >= 0 ? f : Math.min(stageIdx + 1, STAGES.length - 1));
 }
 function toUncleared(){ const k = firstUncleared(); loadStage(k >= 0 ? k : 0); }
 function flowUpdate(){
@@ -3568,7 +4696,12 @@ function flowUpdate(){
     const settled = bugs.every(b => b.state === 'stuck' || b.state === 'gone');
     const hitAll = bugs.every(b => b.impactT >= 0);
     if ((settled && hitAll && testT - lastImpact > 1.8) || testT > 30) evaluate();
-  } else if (phase === 'swipe'){ swipeUpdate(); if (phaseT > 5.2){ phase = 'after'; phaseT = 0; } }
+  } else if (phase === 'swipe'){
+    swipeUpdate();
+    // the last stage: no moving on. once the spider hangs there among the wreck, a bird comes down for it
+    if (stage.bird){ if (!snatch && phaseT > 4.4 && sp.state !== 'gone') startSnatch(); }
+    else if (phaseT > 5.2){ phase = 'after'; phaseT = 0; }
+  }
   else if (phase === 'after') swipeUpdate();
 }
 
@@ -3607,7 +4740,7 @@ function overWater(x){ const w = stageInfo.water; return !!w && x > w[0] && x < 
 function layCrossesDrip(){ if (!sp.lay || !drips.length || DEAD[sp.lay.start]) return false; const s = spinneret(); return crossesDrip([[X[sp.lay.start], Y[sp.lay.start]], s]); }
 function hintText(){
   hintFocus = null; hintMoveFocus = false;
-  if (phase !== 'build') return '';
+  if (phase !== 'build' || sp.state === 'fall') return '';
   if (sp.state === 'cast') return sp.cast && sp.cast.caught >= 0 ? '걸렸어요. 손을 떼면 묶여요.' : '건너편에 걸릴 때까지 누르고 있어요.';
   if (sp.state === 'hang'){
     if (overWater(sp.x) && sp.y > GROUND - 70) return '물 위에는 내려앉을 데가 없어요. 위로 밀면 도로 올라가요.';
@@ -3660,6 +4793,13 @@ function hintText(){
 }
 let stageTries = 0, buildT = 0;
 function stageLate(){ return stageTries > 0 || buildT > 75 || silkLeft < stage.budget * 0.35; }
+function tipLines(tip){ return CHAINS.filter(c => !c.dead && c.type === 'drag' && (c.nodes[0] === tip || c.nodes[c.nodes.length - 1] === tip)); }
+function chainOver(c, x, y, r){
+  // does this line go over the circle at (x, y)
+  const n = c.nodes;
+  for (let j = 1; j < n.length; j++){ if (DEAD[n[j]] || DEAD[n[j - 1]]) continue; if (segDist(x, y, X[n[j - 1]], Y[n[j - 1]], X[n[j]], Y[n[j]]) <= r) return true; }
+  return false;
+}
 function heavyClue(){
   // a heavy bug: how many threads cross its circle, out of how many it needs
   if (stats.lays < 3) return '';
@@ -3672,9 +4812,12 @@ function heavyClue(){
   return '';
 }
 function uncovered(){
-  // how many bug circles have no sticky silk across them yet
+  // how many bug circles have no sticky silk across them yet (and moth rounds no sticky silk across them)
   let n = 0;
-  for (const d of stage.bugs) if (d.at && stickyNear(d.at[0], d.at[1], catchR(BUGT[d.type])) === null) n++;
+  stage.bugs.forEach((d, i) => {
+    if (d.at && stickyNear(d.at[0], d.at[1], catchR(BUGT[d.type])) === null) n++;
+    else if (BUGT[d.type].orbit && !orbitHot[i]) n++;
+  });
   return n;
 }
 
@@ -3717,10 +4860,18 @@ function readInput(){
 function topBand(){ return PM + 128 * UIS; }
 function localXY(e){ const r = cv.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
 function hitButton(x, y){
+  // round buttons first: where the touch areas round two of them overlap, the one whose drawn edge is nearer the finger takes it
+  let circ = null, cs = Infinity;
+  for (const b of uiButtons){
+    if (!b.enabled || !b.circle) continue;
+    const d = Math.hypot(x - b.cx, y - b.cy), s = d - (b.vr === undefined ? b.r : b.vr);
+    if (d <= b.r && s < cs){ cs = s; circ = b; }
+  }
+  if (circ) return circ;
   for (let k = uiButtons.length - 1; k >= 0; k--){
     const b = uiButtons[k];
-    if (!b.enabled) continue;
-    if (b.circle ? Math.hypot(x - b.cx, y - b.cy) <= b.r : (x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h)) return b;
+    if (!b.enabled || b.circle) continue;
+    if (x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h) return b;
   }
   return null;
 }
@@ -3801,7 +4952,7 @@ cv.addEventListener('touchstart', e => {
   e.preventDefault();
   const switched = !touchUI;
   touchUI = true;
-  if (switched) render();
+  if (switched){ measure(); render(); }
   auInit();
   if (mobileLandscape()){ dropAllInput(); return; }
   syncTouches(e.touches, true);
@@ -3834,7 +4985,7 @@ cv.addEventListener('pointerdown', e => {
   if (e.pointerType === 'touch') return;
   auInit();
   const [x, y] = localXY(e);
-  if (e.pointerType === 'pen' && !touchUI){ touchUI = true; render(); }
+  if (e.pointerType === 'pen' && !touchUI){ touchUI = true; measure(); render(); }
   if (mobileLandscape()){ dropAllInput(); e.preventDefault(); return; }
   const b = hitButton(x, y);
   if (b){ ptrs.set(e.pointerId, {role: 'btn', id: b.id, inside: true}); onButtonDown(b.id); }
@@ -3904,7 +5055,7 @@ addEventListener('keydown', e => {
     else if (phase === 'test') retry();
     else if (phase === 'result' && result && !result.pass) retry();
     else if (phase === 'after') nextStage();
-    else if (phase === 'end'){ if (cleared.size < STAGES.length) toUncleared(); else loadStage(0); }
+    else if (phase === 'end' && phaseT > END_WAIT){ if (cleared.size < STAGES.length) toUncleared(); else loadStage(0); }
   }
 });
 addEventListener('keyup', e => keys.delete(e.key.toLowerCase()));
@@ -3916,7 +5067,7 @@ function update(dt){
     return;
   }
   clock += dt; boilT += dt; phaseT += dt;
-  if (phase === 'build') buildT += dt;
+  if (phase === 'build'){ buildT += dt; slipCool -= dt; }
   silkFlash = Math.max(0, silkFlash - dt); toastT = Math.max(0, toastT - dt);
   readInput();
   if (titleT < TITLE_END) titleUpdate(dt);
@@ -3931,17 +5082,21 @@ function update(dt){
     else if (sp.state === 'hang') hangUpdate(dt);
     else if (sp.state === 'cast') castUpdate(dt);
     else if (sp.state === 'spiral') spiralUpdate(dt);
+    else if (sp.state === 'fall') fallUpdate(dt);
+    if (sp.state === 'walk' && sp.lay) layWatch();
     if (!stats.crossed && stats.bridges > 0 && Math.abs(sp.x - X[stageInfo.start]) > 110) stats.crossed = true;
   } else {
     prevIn.lay = false; prevIn.cast = false;
     if (phase === 'clear' && clr) clearUpdate(dt);
     else if (sp.state === 'drop') dropUpdate(dt);
+    else if (sp.state === 'fall') fallUpdate(dt);
+    else if (sp.state === 'taken') takenUpdate();
     else if (sp.state === 'walk'){ if (isWalk(sp.c)){ sp.moving = false; sp.idleT += dt; settle(dt); } else startDestroyDrop(); }
     else if (sp.state === 'hang' && sp.hang){ const top = sp.hang.top; sp.hang = null; sp.state = 'walk'; placeOn(top); }
   }
   if (phase === 'build'){
     hubT -= dt; if (hubT <= 0){ hubT = 0.25; hubNode = mainHub(); }
-    laneT -= dt; if (laneT <= 0){ laneT = 0.25; laneScan(); heavyScan(); }
+    laneT -= dt; if (laneT <= 0){ laneT = 0.25; laneScan(); heavyScan(); orbitScan(); }
     snapT -= dt; if (snapT <= 0){ snapT = 0.1; snapShow = mode === 'drag' && sp.state === 'walk' && !sp.lay && !hubNear() ? snapNode() : -1; }
   }
   if (phase === 'build' && mode === 'sticky' && sp.state === 'walk'){ previewT -= dt; if (previewT <= 0){ previewT = 0.1; preview = makePreview(); } }
@@ -3949,7 +5104,9 @@ function update(dt){
   if (sp.reel){ sp.reel.t += dt; if (sp.reel.t > 0.35) sp.reel = null; }
   spiderForces();
   if (phase === 'test' || phase === 'result' || phase === 'clear') bugsUpdate(dt);
+  birdsUpdate(dt);
   physics(dt);
+  looseUpdate(dt);
   if (objSway.length) peelUpdate();
   dripsUpdate(dt);
   sp.vx = (sp.x - sp.ox) / dt; sp.vy = (sp.y - sp.oy) / dt;
@@ -4069,8 +5226,8 @@ function drawActionLines(){
     brush(pts, BR.spiral, 7004, false, 0.85); beadsAlong(pts);
   }
 }
-const FAIL_LABEL = {miss: '빈 곳', bounce: '끈끈이 없음', tore: '뚫고 나감', heavy: '뚫고 나감', wasp: '찢김'};
-const FAIL_TEXT = {miss: '실이 없는 곳으로 지나갔어요.', bounce: '끈끈이실이 없어서 튕겨 나갔어요.', tore: '줄을 끊고 빠져나갔어요.', heavy: '풍뎅이가 줄이 성긴 데를 뚫고 나갔어요.', wasp: '말벌이 끈끈이에 걸려서 거미줄을 찢었어요.'};
+const FAIL_LABEL = {miss: '빈 곳', bounce: '끈끈이 없음', tore: '뚫고 나감', heavy: '뚫고 나감', wasp: '찢김', orbit: '그냥 감'};
+const FAIL_TEXT = {miss: '실이 없는 곳으로 지나갔어요.', bounce: '끈끈이실이 없어서 튕겨 나갔어요.', tore: '줄을 끊고 빠져나갔어요.', heavy: '풍뎅이가 줄이 성긴 데를 뚫고 나갔어요.', wasp: '말벌이 끈끈이에 걸려서 거미줄을 찢었어요.', orbit: '나방이 도는 길을 가로지르는 끈끈이가 없었어요.'};
 function dotPath(pts, gapB, path){
   for (let i = 1; i < pts.length; i++){
     const a = proj(pts[i - 1][0], pts[i - 1][1], 0), b = proj(pts[i][0], pts[i][1], 0), L = Math.hypot(b[0] - a[0], b[1] - a[1]);
@@ -4208,24 +5365,62 @@ function drawLane(d, i, b, failed){
     ctx.fillText(FAIL_LABEL.wasp, x + r + 4, y - r - 2);
   }
 }
+function drawOrbit(d, i, b, failed){
+  // where a moth goes round the lamp: a ring of dots with arrows going round. green once sticky silk crosses it, which is all it takes
+  if (phase !== 'build' && b && (b.state === 'gone' || b.state === 'stuck') && !failed) return;
+  const P = d.loop, L = polyLen(P), ph = boilPhase(), core = new Path2D(), hair = new Path2D(), hot = phase === 'build' && orbitHot[i];
+  for (let s = 0; s < L; s += 10){ const a = alongPath(P, s), c = alongPath(P, Math.min(L, s + 4.5)); brushInto(core, hair, [[a[0], a[1]], [c[0], c[1]]], BR.fine, ph, 5300 + i * 97 + Math.round(s), false); }
+  for (let k = 0; k < 4; k++){
+    const a = alongPath(P, L * (k + 0.12) / 4), ar = 6.5;
+    for (const sd of [1, -1]) brushInto(core, hair, [[a[0], a[1]], [a[0] - Math.cos(a[2] + sd * 0.55) * ar, a[1] - Math.sin(a[2] + sd * 0.55) * ar]], BR.fine, ph, 5390 + i * 13 + k * 2 + (sd > 0 ? 0 : 1), false);
+  }
+  const cc = failed ? RED_CORE : hot ? rgbaOf(COL.beetle, 0.95) : INK_CORE, hc = failed ? RED_HAIR : hot ? rgbaOf(COL.beetle, 0.6) : INK_HAIR;
+  strokeArt(core, hair, hot || failed ? {...BR.fine, cw: 1.35} : BR.fine, hot || failed ? 1 : 0.8, cc, hc);
+  // the name, outside the round on its right
+  let rx = -1e9, ry = 0; for (const p of P) if (p[0] > rx){ rx = p[0]; ry = p[1]; }
+  ctx.fillStyle = failed ? rgbaOf(COL.stress, 0.95) : hot ? rgbaOf(COL.beetle, 0.95) : rgbaOf(COL.graphite, 0.85);
+  ctx.font = `${failed ? 700 : 500} ${(12 / S).toFixed(1)}px ${FONT}`; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+  ctx.fillText(failed ? FAIL_LABEL.orbit : BUGT[d.type].name, rx + 7, ry);
+}
 let labelCache = null;
+function boxHitsSeg(b, x0, y0, x1, y1){
+  // does the segment pass through the box [x0, y0, x1, y1] (clipped against each side in turn)
+  let t0 = 0, t1 = 1; const dx = x1 - x0, dy = y1 - y0;
+  for (const [p, q] of [[-dx, x0 - b[0]], [dx, b[2] - x0], [-dy, y0 - b[1]], [dy, b[3] - y0]]){
+    if (p === 0){ if (q < 0) return false; continue; }
+    const t = q / p;
+    if (p < 0){ if (t > t1) return false; if (t > t0) t0 = t; }
+    else { if (t < t0) return false; if (t < t1) t1 = t; }
+  }
+  return true;
+}
+function boxDist(b, x, y){ return Math.hypot(Math.max(b[0] - x, 0, x - b[2]), Math.max(b[1] - y, 0, y - b[3])); }
 function targetLabels(){
-  // where each bug's name goes: beside its circle, clear of the other circles and names (and of the right edge, where posts and walls stand)
+  // where each bug's name goes: beside its circle, clear of the other circles and names, of the right edge,
+  // and of the posts, poles and stems standing about (a name written across a post is hard to read)
   if (labelCache && labelCache.stage === stageIdx && labelCache.S === S) return labelCache.list;
   const fs = 12 / S, hh = fs * 0.6; ctx.font = `500 ${fs.toFixed(1)}px ${FONT}`;
-  const placed = [], list = [];
+  const placed = [], list = [], segs = [];
   for (const d of stage.bugs) if (d.at){ const r = catchR(BUGT[d.type]); placed.push([d.at[0] - r, d.at[1] - r, d.at[0] + r, d.at[1] + r]); }
+  for (let c = 0; c < CI.length; c++){
+    const a = CI[c], b = CJ[c];
+    if (CCH[c] >= 0 || DEAD[a] || DEAD[b] || KIND[a] !== K_SURF || KIND[b] !== K_SURF) continue;
+    segs.push([X[a], Y[a], X[b], Y[b]]);
+  }
   stage.bugs.forEach((d, i) => {
     if (!d.at){ list[i] = null; return; }
     const T = BUGT[d.type], r = catchR(T), [x, y] = d.at, w = ctx.measureText(T.name).width + 2;
     const cands = [[x + r + 4, y - r - 2, 'left'], [x - r - 4, y - r - 2, 'right'], [x + r + 4, y + r + 4, 'left'], [x - r - 4, y + r + 4, 'right'], [x, y - r - 2 - hh, 'center'], [x, y + r + 4 + hh, 'center']];
     if (x > 380) cands.unshift(cands.splice(1, 1)[0]);
-    let pick = null;
+    // never over another circle or name; better not across a post, and better clearly nearer its own circle than any other
+    let pick = null, best = 1e9;
     for (const [lx, ly, al] of cands){
       const x0 = al === 'left' ? lx : al === 'right' ? lx - w : lx - w / 2, box = [x0, ly - hh, x0 + w, ly + hh];
       if (box[0] < 6 || box[2] > VW - 6) continue;
       if (placed.some(b => b[0] < box[2] && box[0] < b[2] && b[1] < box[3] && box[1] < b[3])) continue;
-      pick = {x: lx, y: ly, align: al, box}; break;
+      const own = boxDist(box, x, y), other = stage.bugs.some((e, j) => j !== i && e.at && boxDist(box, e.at[0], e.at[1]) < own * 2 + 4);
+      const pen = (segs.some(g => boxHitsSeg(box, g[0], g[1], g[2], g[3])) ? 2 : 0) + (other ? 1 : 0);
+      if (pen < best){ best = pen; pick = {x: lx, y: ly, align: al, box}; if (!pen) break; }
     }
     if (!pick){ const lx = x + r + 4, ly = y - r - 2; pick = {x: lx, y: ly, align: 'left', box: [lx, ly - hh, lx + w, ly + hh]}; }
     placed.push(pick.box); list[i] = pick;
@@ -4241,6 +5436,7 @@ function drawTargets(){
   stage.bugs.forEach((d, i) => {
     const b = bugs[i], failed = showFail && b && b.fail;
     if (BUGT[d.type].lane){ drawLane(d, i, b, failed); return; }
+    if (BUGT[d.type].orbit){ drawOrbit(d, i, b, failed); return; }
     if (phase !== 'build' && b && b.impactT >= 0 && !failed) return;
     const T = BUGT[d.type], [x, y] = d.at, r = catchR(T);
     if (lay && segDist(x, y, lay[0], lay[1], lay[2], lay[3]) <= r){
@@ -4254,11 +5450,13 @@ function drawTargets(){
       brush([[x + Math.cos(a0) * r, y + Math.sin(a0) * r], [x + Math.cos((a0 + a1) / 2) * r, y + Math.sin((a0 + a1) / 2) * r], [x + Math.cos(a1) * r, y + Math.sin(a1) * r]], BR.fine, 3000 + i * 40 + k, false, failed ? 1 : 0.75, cc, hc);
     }
     if (touchUI && r * S < 9){
-      const R = Math.max(r + 2 / S, 14 / S), L = 5 / S;
+      const R = Math.max(r + 2 / S, 14 / S), L = 5 / S, pad = 2 / S;
       const o = {...BR.fine, cw: Math.max(BR.fine.cw, 1.2 / S), hw: Math.max(BR.fine.hw, 0.45 / S)};
+      const names = targetLabels().filter(Boolean).map(q => [q.box[0] - pad, q.box[1] - pad, q.box[2] + pad, q.box[3] + pad]);
       for (let k = 0; k < 4; k++){
-        const a = k * Math.PI / 2;
-        brush([[x + Math.cos(a) * R, y + Math.sin(a) * R], [x + Math.cos(a) * (R + L), y + Math.sin(a) * (R + L)]], o, 3470 + i * 8 + k, false, failed ? 1 : 0.85, cc, hc);
+        const a = k * Math.PI / 2, x0 = x + Math.cos(a) * R, y0 = y + Math.sin(a) * R, x1 = x + Math.cos(a) * (R + L), y1 = y + Math.sin(a) * (R + L);
+        if (names.some(b => boxHitsSeg(b, x0, y0, x1, y1))) continue;
+        brush([[x0, y0], [x1, y1]], o, 3470 + i * 8 + k, false, failed ? 1 : 0.85, cc, hc);
       }
     }
     if (failed) for (const sg of [1, -1]) brush([[x - r * 0.6, y - r * 0.6 * sg], [x + r * 0.6, y + r * 0.6 * sg]], BR.fine, 3500 + i * 3 + sg, false, 1, cc, hc);
@@ -4278,7 +5476,7 @@ function drawTargets(){
 }
 function drawBug(b, front){
   if (b.state === 'wait' || b.state === 'gone') return;
-  const isFront = b.state === 'stuck' || b.state === 'through' || b.state === 'lane' || b.state === 'caught';
+  const isFront = b.state === 'stuck' || b.state === 'through' || b.state === 'lane' || b.state === 'orbit' || b.state === 'caught';
   if (front !== isFront) return;
   const z = b.state === 'stuck' ? Z[b.p] : b.z;
   const x = b.state === 'stuck' ? X[b.p] : b.x, y = b.state === 'stuck' ? Y[b.p] : b.y;
@@ -4295,12 +5493,13 @@ function drawBug(b, front){
   }
   const ang = b.state === 'stuck' ? -0.9 + Math.sin(clock * 3 + b.ang) * 0.2 : b.state === 'caught' ? b.ang + Math.sin(clock * 37) * 0.5 : b.ang;
   ctx.rotate(ang);
-  const flap = buzzing ? Math.abs(Math.sin(clock * 80 + b.ang)) : 0.15;
+  const flap = buzzing ? Math.abs(Math.sin(clock * (b.type === 'moth' ? 26 : 80) + b.ang)) : 0.15;
   if (b.type === 'fly') drawFlyGlyph(flap);
   else if (b.type === 'gnat') drawGnatGlyph(flap);
   else if (b.type === 'wasp') drawWaspGlyph(flap);
   else if (b.type === 'beetle') drawBeetleGlyph(flap, b.state === 'fly');
   else if (b.type === 'hopper') drawHopperGlyph(flap, b.state === 'fly');
+  else if (b.type === 'moth') drawMothGlyph(flap);
   else drawBeeGlyph(flap);
   ctx.restore();
 }
@@ -4399,6 +5598,24 @@ function drawGnatGlyph(flap){
   ctx.fillStyle = rgbaOf(COL.graphite, 0.8); ctx.fill(polyPath(body)); brush(body, BR.fine, 620, true);
   ctx.fillStyle = COL.graphite; ctx.beginPath(); ctx.arc(3.4, 0, 1.4, 0, TAU); ctx.fill();
 }
+function drawMothGlyph(flap){
+  // a moth: broad dusty wings with a darker band, a furry body, feathery feelers
+  const o = 0.35 + 0.65 * flap;
+  for (const s of [1, -1]){
+    const hind = [[-1, s * 1.5], [-4, s * (4 + 5 * o)], [-9, s * (5 + 4.5 * o)], [-11, s * (2.5 + 1.5 * o)], [-7, s * 1.2]];
+    ctx.fillStyle = COL.moth; ctx.fill(polyPath(hind)); brush(hind, BR.fine, 5400 + s, true, 0.85);
+    const fore = [[2.5, s * 1.4], [0, s * (5 + 7 * o)], [-6, s * (8 + 6 * o)], [-9.5, s * (6 + 4 * o)], [-6.5, s * 2]];
+    ctx.fillStyle = COL.moth; ctx.fill(polyPath(fore));
+    ctx.fillStyle = rgbaOf(COL.mothDeep, 0.8); ctx.fill(polyPath([[0.5, s * (3 + 3.5 * o)], [-2, s * (5.5 + 5 * o)], [-4.6, s * (5 + 4.6 * o)], [-2.5, s * (2.6 + 3 * o)]]));
+    brush(fore, BR.fine, 5402 + s, true, 0.9);
+    brush([[5.4, s * 0.8], [8.5, s * 2.8], [10.4, s * 3.4]], BR.fine, 5404 + s, false, 0.9);
+    for (let k = 0; k < 3; k++) brush([[6.2 + k * 1.3, s * (1.5 + k * 0.7)], [6.6 + k * 1.3, s * (2.6 + k * 0.7)]], BR.fine, 5406 + k + (s > 0 ? 0 : 5), false, 0.6);
+  }
+  const body = ellipsePts(-1.5, 0, 6, 2.2, 12);
+  ctx.fillStyle = COL.mothDeep; ctx.fill(polyPath(body)); brush(body, BR.fine, 5420, true);
+  const head = ellipsePts(5, 0, 1.8, 1.8, 8);
+  ctx.fillStyle = COL.mothDeep; ctx.fill(polyPath(head)); brush(head, BR.fine, 5421, true);
+}
 function drawBeeGlyph(flap){
   wings(flap, -2.5, 6.2, 4, 700);
   const body = ellipsePts(-2, 0, 6.4, 4.2, 16);
@@ -4428,6 +5645,7 @@ function legPoints(lg){
   return [[Hx, Hy], [Kx, Ky], [Tx, Ty], [Fx, Fy]].map(p => { const q = proj(p[0], p[1], sp.z); return [q[0], q[1]]; });
 }
 function drawSpider(){
+  if (sp.state === 'gone') return;
   const ph = boilPhase();
   ctx.save();
   const core = new Path2D(), hair = new Path2D(), up = sp.cheer > 0.02, coreU = new Path2D(), hairU = new Path2D();
@@ -4655,7 +5873,7 @@ function roundBtn(id, label, cx, cy, r, sub, beads){
   if (beads){ const B = new Path2D(); for (let k = 0; k < beads; k++){ const a = k / beads * TAU; const x = cx + Math.cos(a) * (r - 5 * UIS), y = cy + Math.sin(a) * (r - 5 * UIS); B.moveTo(x + 1.3, y); B.arc(x, y, 1.3, 0, TAU); } ctx.fillStyle = rgbaOf(COL.graphite, 0.75); ctx.fill(B); }
   text(label, cx, cy - (sub ? 4 * UIS : 0), 700, (label.length > 2 ? 13 : 16) * UIS, 'center');
   if (sub) text(sub, cx, cy + 12 * UIS, 500, 10 * UIS, 'center', 0.7);
-  uiButtons.push({id, circle: true, cx, cy, r: r + 8, enabled: true});
+  uiButtons.push({id, circle: true, cx, cy, r: r + 8, vr: r, enabled: true});
 }
 function card(x, y, w, h){
   const pts = roundRectPts(x, y, w, h, 14 * UIS);
@@ -4688,15 +5906,12 @@ function drawUI(){
   text(`남은 실 ${(silkLeft / 1000).toFixed(1)}m`, L + gw + 8 * UIS, gy + gh / 2, 500, 13 * UIS, 'left', silkFlash > 0 ? 1 : 0.85);
   if (!touchUI) text(`실 종류  ${modeName()}`, L, gy + 26 * UIS, 700, 13 * UIS, 'left', 0.9);
   const R = SW - PM - 12 * UIS;
-  // 정착하기 (the bugs come) stands alone at the top right, and 되돌리기 is far from it: on a phone at the top left under the silk,
-  // on a computer at the bottom right by the keys. 처음부터 is in the list under the stage name
+  // 정착하기 (the bugs come) stands alone at the top right, and 되돌리기 is far from it: on a phone down with the other buttons under
+  // the right thumb, on a computer at the bottom right by the keys. 처음부터 is in the list under the stage name
   const canUndo = UNDO.length > 0 || sp.state !== 'walk' || !!sp.lay;
-  if (phase === 'build' || phase === 'test'){
-    pill('test', phase === 'test' ? '정착 취소' : '정착하기', R, T, 'right', true);
-    if (phase === 'build' && touchUI) undoPill(L, T + 58 * UIS, 'left', canUndo);
-  }
-  // on a phone the hint goes below 되돌리기, which is at the top left there. while the name of the game is up, it takes this place
-  const y0 = touchUI ? T + 112 * UIS : PM + 100 * UIS, showTitle = titleT < TITLE_END && toastT <= 0;
+  if (phase === 'build' || phase === 'test') pill('test', phase === 'test' ? '정착 취소' : '정착하기', R, T, 'right', true);
+  // the hint goes under the silk at the top. while the name of the game is up, it takes this place
+  const y0 = touchUI ? T + 62 * UIS : PM + 100 * UIS, showTitle = titleT < TITLE_END && toastT <= 0;
   const hint = hintText();
   const h = showTitle ? '' : toastT > 0 ? toastMsg : hint, focus = showTitle || toastT > 0 || !stage.tut || phase !== 'build' || pickOpen ? null : hintFocus;
   if (showTitle) drawTitle(y0);
@@ -4723,23 +5938,21 @@ function drawUI(){
     why.forEach((l, k) => text(l, SW / 2, y + (112 + k * 22) * UIS, 500, 13.5 * UIS, 'center', 0.85));
     pill('retry', '고쳐서 다시 하기', SW / 2, y + hh - 50 * UIS, 'center', true);
   }
-  // the web is gone: the spider moves on, after the last stage too (the end card comes next)
+  // the web is gone: the spider moves on
   if (phase === 'after') pill('next', '다시 떠나기', SW / 2, SH - PM - 64 * UIS, 'center', true);
-  if (phase === 'end'){
-    const left = STAGES.length - cleared.size, w = 280 * UIS, hh = 124 * UIS, x = SW / 2 - w / 2, y = SH / 2 - hh / 2;
-    card(x, y, w, hh);
-    text(left ? `아직 못 깬 스테이지가 ${left}개 있어요.` : '떠날 곳이 없어요.', SW / 2, y + 38 * UIS, 500, 14 * UIS, 'center');
-    if (left) pill('uncleared', '못 깬 스테이지로', SW / 2, y + 68 * UIS, 'center', true);
-    else pill('restart', '처음부터', SW / 2, y + 68 * UIS, 'center', true);
+  // the last stage, after the bird: no words. a while later, where '다시 떠나기' would be, only the way back
+  if (phase === 'end' && phaseT > END_WAIT){
+    const left = STAGES.length - cleared.size;
+    pill(left ? 'uncleared' : 'restart', left ? '못 깬 스테이지로' : '처음부터', SW / 2, SH - PM - 64 * UIS, 'center', true);
   }
   if (pickOpen) drawStageList();
   else if (phase === 'build'){
     if (touchUI){
-      const br = SW - PM, bb = SH - PM;
-      const beadN = mode === 'drag' ? 0 : 22;
-      roundBtn('lay', '실', br - 66 * UIS, bb - 78 * UIS, 40 * UIS, null, beadN);
-      if (!stage.noCast) roundBtn('cast', '날리기', br - 154 * UIS, bb - 50 * UIS, 31 * UIS);
-      roundBtn('mode', mode === 'drag' ? '뼈대' : '끈끈이', br - 112 * UIS, bb - 158 * UIS, 29 * UIS, '실 종류', beadN);
+      const P = padLayout(), beadN = mode === 'drag' ? 0 : 22;
+      roundBtn('lay', '실', P.lay[0], P.lay[1], P.r1, null, beadN);
+      if (!stage.noCast) roundBtn('cast', '날리기', P.cast[0], P.cast[1], P.r2);
+      roundBtn('mode', mode === 'drag' ? '뼈대' : '끈끈이', P.mode[0], P.mode[1], P.r3, '실 종류', beadN);
+      undoPill(P.undo[0], P.undo[1], 'left', canUndo);
       const R0 = stickR();
       const moveFocus = focus === 'lay' && hintMoveFocus;
       if (stick.id !== null){
@@ -4749,7 +5962,7 @@ function drawUI(){
         ctx.fillStyle = rgbaOf(COL.graphite, 0.12); ctx.fill(polyPath(kp)); brush(kp, UB2, 62, true);
         if (moveFocus) pulseStickGuide(stick.cx, stick.cy);
       } else if (!stickUsed || moveFocus){
-        const gx = PM + 82 * UIS, gyy = SH - PM - 96 * UIS;
+        const gx = Math.min(PM + 82 * UIS, P.x0 - R0 - 10 * UIS), gyy = SH - PM - 96 * UIS;
         brush(ellipsePts(gx, gyy, R0, R0, 24), UB, 61, true, moveFocus ? 0.55 : 0.3);
         brush(ellipsePts(gx, gyy, 19 * UIS, 19 * UIS, 16), UB, 62, true, moveFocus ? 0.55 : 0.3);
         if (moveFocus) pulseStickGuide(gx, gyy);
@@ -4945,6 +6158,7 @@ function render(){
   ctx.beginPath(); ctx.rect(PM, PM, PW, PH); ctx.clip();
   ctx.setTransform(DPR * S, 0, 0, DPR * S, DPR * OX, DPR * OY);
   project();
+  drawBusBack();
   drawWorld();
   drawMotes();
   drawShadow();
@@ -4956,12 +6170,14 @@ function render(){
   drawDrops();
   drawHubMark();
   drawSpiralPreview();
+  drawLoose();
   drawActionLines();
   drawSpider();
   drawHubLit();
   for (const b of bugs) drawBug(b, true);
   drawGlints();
   drawImpacts();
+  drawBirds();
   drawDestroyer();
   ctx.restore();
   drawUI();
@@ -5011,7 +6227,7 @@ if (MANUAL){
     boxes(){ return uiButtons.map(b => b.circle ? {id: b.id, cx: b.cx, cy: b.cy, r: b.r, vr: b.vr, on: b.enabled} : {id: b.id, x: b.x, y: b.y, w: b.w, h: b.h, on: b.enabled}); },
     undoDepth(){ return UNDO.length; },
     pick(){ return {open: pickOpen, sel: pickSel}; },
-    touch(on){ touchUI = !!on; render(); },
+    touch(on){ touchUI = !!on; measure(); render(); },
     state(){ return {phase, stage: stageIdx, sp: {state: sp.state, x: +sp.x.toFixed(1), y: +sp.y.toFixed(1), c: sp.c, t: +sp.t.toFixed(2)}, cast: sp.cast ? {len: sp.cast.len, caught: sp.cast.caught} : null,
       stats: {...stats}, silk: Math.round(silkLeft), chains: CHAINS.filter(c => !c.dead).length, snapped: CHAINS.filter(c => !c.dead && c.snapped).length, mode,
       bugs: bugs.map(b => b.state), result}; },
@@ -5059,12 +6275,20 @@ if (MANUAL){
       if (sp.state === 'spiral' && !sp.spi) bad.push('spiral without spi');
       if (sp.state === 'cast' && !sp.cast) bad.push('cast without cast');
       if ((sp.state === 'hang' || sp.state === 'drop') && !sp.hang) bad.push(sp.state + ' without hang');
+      if (sp.state === 'fall' && !sp.fall) bad.push('fall without fall');
       if (sp.state === 'walk' && !isWalk(sp.c)) bad.push('walk on dead edge');
       for (const lg of sp.legs) if (lg.state === 'hold' && !lg.hold) bad.push('hold without hold');
       return {nan, bad, n: X.length, m: CI.length, chains: CHAINS.length, phase, st: sp.state, stick: stick.id, ptrs: ptrs.size};
     },
     bugz(){ return bugs.map(b => b.p >= 0 ? [b.type, +X[b.p].toFixed(1), +Y[b.p].toFixed(1), +Z[b.p].toFixed(1), b.links.filter(L => !CB[L.c]).length, b.fail, b.support || null] : [b.type, b.state, b.fail, b.support || null]); },
     swipe(){ phase = 'clear'; startSwipe(true); },
+    birds(){ return birds.map(B => ({state: B.state, step: B.step || null, x: +B.x.toFixed(1), y: +B.y.toFixed(1), k: B.k, seq: B.seq || null})); },
+    visit(seq){ return startVisit(seq || [0]); },
+    dips(){ return objDip.map((o, i) => o ? {o: i, a: +o.a.toFixed(3), tgt: o.tgt} : null).filter(Boolean); },
+    orbit(){ return orbitHot.slice(); },
+    linesOnDips(){ return linesOnDips(); },
+    snatchNow(){ if (sp.state === 'walk') startDestroyDrop(); phase = 'swipe'; phaseT = 4.3; dz = dz || {ev: [], on: false}; return true; },
+    birdPose(o){ birds = [Object.assign({state: 'show', x: 270, y: 400, dir: 1, sc: 1, ang: 0, beta: null, fan: 0, legs: 'perch'}, o)]; render(); return birds[0]; },
     sway(){ return {g: +gustOf(clock).toFixed(3), a: objSway.map((w, o) => w ? +swayAngle(o).toFixed(3) : null), onLeaves: onSwaying()}; },
     support(x, y){ const s = support(x, y, BUGT.beetle); return {n: s.n, sticky: s.sticky}; },
     perfMax(n){ const ts = []; for (let i = 0; i < n; i++){ const t0 = performance.now(); update(STEP); ts.push(performance.now() - t0); } ts.sort((a, b) => a - b); return {avg: ts.reduce((a, b) => a + b, 0) / n, p99: ts[Math.floor(n * 0.99)], p999: ts[Math.floor(n * 0.999)], max: ts[n - 1]}; },
@@ -5076,6 +6300,15 @@ if (MANUAL){
     quaking(){ return {amp: +quakeAmp().toFixed(3), next: +quakeIn.toFixed(1), bits: bits.length}; },
     fx(){ return {glints: glints.length, bits: bits.length, strumCD: +strumCD.toFixed(2)}; },
     setSilk(v){ silkLeft = v; },
+    slips(f){ slipForce = f || ''; return {force: slipForce, cool: +slipCool.toFixed(1), loose: loose.length}; },
+    junction(dx, dy){
+      // what the junction check would see now: the line the spider is on, and the branches at its ends
+      const c = sp.c, a = CI[c], b = CJ[c], L = Math.hypot(X[b] - X[a], Y[b] - Y[a]) || 1e-6, al = edgeAlong(c, dx, dy), F = alongF, R = alongR;
+      const ends = [[a, sp.t * L], [b, (1 - sp.t) * L]].map(([n, dn]) => ({n, dn: +dn.toFixed(1), edges: ADJ[n].filter(e => e !== c && isWalk(e)).map(e => ({e, s: +edgeReach(n, e, dx, dy).toFixed(3)}))}));
+      return {c, a, b, L: +L.toFixed(1), t: +sp.t.toFixed(2), al: +al.toFixed(3), F: +F.toFixed(3), R: +R.toFixed(3), ends};
+    },
+    reach(node, dx, dy){ return ADJ[node].filter(isWalk).map(c => { const o = CI[c] === node ? CJ[c] : CI[c]; return {c, o, dir: +(Math.atan2(Y[o] - Y[node], X[o] - X[node]) * 180 / Math.PI).toFixed(1), len: +Math.hypot(X[o] - X[node], Y[o] - Y[node]).toFixed(1), reach: +edgeReach(node, c, dx, dy).toFixed(3)}; }); },
+    slipInfo(){ return {lay: sp.lay ? sp.lay.slipAt : null, cast: sp.cast ? sp.cast.slipAt : null, hang: sp.hang ? sp.hang.slipAt : null, fall: sp.fall ? {...sp.fall} : null, loose: loose.map(L => ({n: L.P.length, pin: L.pin, age: +(clock - L.t0).toFixed(2)}))}; },
     bugT(name, props){ Object.assign(BUGT[name], props); return BUGT[name]; },
     moveTarget(i, x, y){ stage.bugs[i].at = [x, y]; },
     audio(){ return AU.ctx ? {state: AU.ctx.state, amb: !!AU.amb, t: +AU.ctx.currentTime.toFixed(2)} : null; },
@@ -5103,7 +6336,8 @@ if (MANUAL){
         buildStrum: () => { for (let k = 0; k < 4; k++) hum(noteOf(60 + k * 80), 0.018, 0, AU.off + k * 0.17); },
         hop: () => { for (let k = 0; k < 5; k++) pluck(noteOf(120, k), 0.1, 0, AU.off + 0.09 + k * 0.46); },
         lay: () => pluck(700, 0.15, 0), snap: () => pluck(900, 0.24, 0), thump: () => thump(0.85), whoosh: () => noiseHit(0.5, 500, 3800, 0.6, 0.55),
-        storm: () => storm(0.95), tear: () => noiseHit(0.24, 3200, 1300, 0.8, 0.3), land: () => { thump(0.9); noiseHit(0.3, 900, 160, 0.6, 0.32, 'lowpass'); }
+        storm: () => storm(0.95), tear: () => noiseHit(0.24, 3200, 1300, 0.8, 0.3), land: () => { thump(0.9); noiseHit(0.3, 900, 160, 0.6, 0.32, 'lowpass'); },
+        bulbul: () => bulbulCall(0, 0.07), flutter: () => flutter(0, 1.0, 0.08), bus: () => busSound(), slap: () => flyerSlap(), ladder: () => ladderClank()
       };
       for (const [t, what] of plan){ AU.off = t; P[what](); }
     } finally { Object.assign(AU, keep); seasonOverride = keepS; }
