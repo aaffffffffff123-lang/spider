@@ -7,7 +7,7 @@
 <meta property="og:title" content="거미살이">
 <meta property="og:description" content="거미가 되어 자리마다 튼튼한 거미줄을 치는 퍼즐 게임">
 <title>거미살이</title>
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='10' fill='%23fff'/%3E%3Cg fill='none' stroke='%23141416' stroke-width='5' stroke-linecap='round'%3E%3Cpath d='M25 25 13 16M23 31 9 28M23 38 9 41M26 45 15 54M39 25 51 16M41 31 55 28M41 38 55 41M38 45 49 54'/%3E%3C/g%3E%3Cellipse cx='32' cy='35' rx='11' ry='17' fill='%23ffd21a' stroke='%23141416' stroke-width='3'/%3E%3Cpath d='M22 31h20M22 40h20' stroke='%23141416' stroke-width='5'/%3E%3Ccircle cx='32' cy='16' r='7' fill='%23141416'/%3E%3C/svg%3E">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%3E%0A%20%20%3Crect%20width%3D%2264%22%20height%3D%2264%22%20rx%3D%224%22%20fill%3D%22%23fff%22%2F%3E%0A%20%20%3Cg%20fill%3D%22none%22%20stroke%3D%22%23141416%22%20stroke-width%3D%223.5%22%20stroke-linecap%3D%22butt%22%20stroke-linejoin%3D%22miter%22%3E%0A%20%20%20%20%3Cpath%20d%3D%22M29%2027%2023%2018%2023%202M35%2027%2041%2018%2041%202%22%2F%3E%0A%20%20%20%20%3Cpath%20d%3D%22M28%2031%2011%2025%2011%206M36%2031%2053%2025%2053%206%22%2F%3E%0A%20%20%20%20%3Cpath%20d%3D%22M28%2035%2011%2041%2011%2059M36%2035%2053%2041%2053%2059%22%2F%3E%0A%20%20%20%20%3Cpath%20d%3D%22M29%2039%2023%2047%2023%2062M35%2039%2041%2047%2041%2062%22%2F%3E%0A%20%20%3C%2Fg%3E%0A%20%20%3Cg%20fill%3D%22%23141416%22%3E%0A%20%20%20%20%3Cellipse%20cx%3D%2232%22%20cy%3D%2221.7%22%20rx%3D%223.7%22%20ry%3D%224.6%22%2F%3E%0A%20%20%20%20%3Cpath%20d%3D%22M32%2024C28.7%2024%2027.6%2027.7%2028.1%2033.5%2028.6%2039.2%2030%2044%2032%2047.5%2034%2044%2035.4%2039.2%2035.9%2033.5%2036.4%2027.7%2035.3%2024%2032%2024Z%22%2F%3E%0A%20%20%3C%2Fg%3E%0A%3C%2Fsvg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@500;700&display=swap">
@@ -1421,7 +1421,7 @@ const STAGES = [
     }
   },
   {
-    id: 'cosmos', season: 0, tut: true, name: '가운데 옮기기', wind: [74, -5], budget: 9000, destroyer: 'strap', intro: '이번에는 벌레 자리가 줄을 건너 걸 높이보다 한참 아래예요. 거미줄의 가운데를 벌레들 사이로 옮겨 봐요.',
+    id: 'cosmos', season: 0, tut: true, name: '가운데 옮기기', wind: [74, -5], budget: 9000, destroyer: 'strap', intro: '이번에는 벌레 자리가 건너가는 줄보다 한참 아래예요. 뼈대실이 가장 많이 모인 곳이 노란 가운데가 돼요. 벌레들 사이에서 새로 줄을 모아 가운데를 옮겨 봐요.',
     bugs: [{type: 'fly', at: [236, 470], delay: 0.5}, {type: 'fly', at: [322, 500], delay: 2.4}],
     build(){
       const g = GROUND;
@@ -1622,7 +1622,7 @@ const STAGES = [
       }
       const hs = hubNode >= 0 ? side(X[hubNode]) : -1;
       if (hs >= 0 && stats.sticky > 0 && open[hs] === 0 && open[1 - hs] > 0) return '이쪽은 다 감았어요. 물방울 떨어지는 데 건너편에도 거미줄을 따로 쳐요.';
-      if (stageLate() && open[0] + open[1] > 0) return "물방울 떨어지는 데 양쪽에 거미줄을 하나씩 쳐요. 한쪽을 다 감은 다음 다른 쪽에 줄을 모으면, 줄이 많이 모인 데로 '가운데'가 옮겨가요.";
+      if (stageLate() && open[0] + open[1] > 0) return "물방울 떨어지는 데 양쪽에 거미줄을 하나씩 쳐요. 한쪽을 다 감은 다음, 지금 '가운데'에 모인 만큼 건너편에도 뼈대실을 모으면 가운데가 옮겨가요.";
       return '';
     },
     bugs: [{type: 'fly', at: [113, 466], delay: 0.5}, {type: 'fly', at: [176, 534], delay: 1.4}, {type: 'fly', at: [365, 504], delay: 2.3}, {type: 'fly', at: [420, 418], delay: 3.2}],
@@ -4556,6 +4556,7 @@ function restoreSnap(s){
   for (const lg of sp.legs) unplant(lg);
   rebuildHash();
   if (!isWalk(sp.c)) relocate();
+  snapLegPose();
 }
 function settleSpider(){
   // whatever the spider is in the middle of is finished or dropped first (a fall is played out to where it lands)
@@ -4749,10 +4750,12 @@ function hintText(){
   if (sp.state === 'spiral') return `한 바퀴 감는 중이에요. ${obj('lay')} 다시 누르면 멈춰요.`;
   if (laneHot.some(Boolean)) return `끈끈이가 말벌 길(빨간 점선)에 걸쳐 있어요. 말벌이 거기 걸리면 거미줄을 찢어요. ${obj('undo', '으로', '로')} 빼세요.`;
   if (layCrossesDrip()) return '이 줄은 물방울이 떨어지는 데를 지나가요. 치면 바로 끊겨요.';
+  if (stage.id === 'tut-sticky' && mode !== 'sticky' && stats.sticky === 0) return `노란 점이 거미줄의 '가운데'예요. 뼈대실은 길이 되고, 끈끈이실에는 벌레가 붙어요. ${obj('mode')} 눌러 끈끈이실로 바꿔 보세요.`;
   if (mode === 'sticky' && sp.state === 'walk' && preview){
-    if (preview.fail === 'close') return '가운데에 너무 가까워요. 살을 타고 바깥으로 조금 나가세요.';
+    if (preview.fail === 'close') return '가운데에 너무 가까워요. 살을 타고 바깥으로 조금 나가세요. 노란 점에서 멀어질수록 감길 바퀴도 커져요.';
     if (preview.fail === 'off') return '세로줄(살) 위에 서면, 그 높이로 감길 줄이 점선으로 보여요.';
     if (preview.fail === 'gap') return '양옆 살이 이 높이까지 안 와서 못 감아요. 가운데 쪽으로 더 들어오세요.';
+    if (preview.fail === 'nohub') return "아직 '가운데'가 없어요. 뼈대실 세 갈래 이상이 한곳에 모이면 그곳이 가운데가 돼요.";
     if (preview.fail) return '세로줄이 더 있어야 끈끈이를 감을 수 있어요.';
     if (preview.lane) return '이 바퀴는 말벌 길을 지나가요. 말벌 길 쪽으로 살이 없어야 바퀴가 그 앞에서 끊겨요.';
     if (preview.drip) return '이 바퀴는 물방울이 떨어지는 데를 지나가요. 감으면 거기서 끊겨요.';
@@ -4761,6 +4764,7 @@ function hintText(){
     const tail = preview.closed ? '' : ' 빨간 ×는 바퀴가 끊기는 곳이에요.';
     if (stats.sticky > 0 && uncovered() === 0) return `동그라미마다 끈끈이가 지나가요. 다 쳤으면 ${obj('test')} 누르세요.${stage.tut ? ' 그러면 동그라미로 벌레가 와요.' : ''}`;
     if (stats.sticky > 0) return `살을 따라 조금 옮겨서 ${obj('lay')} 누르면 한 바퀴 더 감아요.${tail}`;
+    if (stage.id === 'tut-sticky') return `노란 '가운데'를 둘러 감길 줄이 점선으로 보여요. 살을 타고 바깥으로 나갈수록 바퀴가 커져요. 점선이 벌레 동그라미를 지날 때 ${obj('lay')} 누르세요.${tail}`;
     return `살을 따라 걸으면 점선이 따라 움직여요. 점선이 벌레 동그라미를 지날 때 ${obj('lay')} 누르세요.${tail}`;
   }
   const tut = !!stage.tut, needBridge = stage.needBridge !== false && !stage.noCast;
@@ -4771,7 +4775,7 @@ function hintText(){
   }
   if (tut && needBridge && !stats.crossed) return '줄을 타고 건너가 보세요.';
   if (tut && stats.drops === 0) return '벌레 동그라미들 바로 위까지 줄을 타고 가서, 아래로 밀고 있으면 실을 달고 내려가요.';
-  if (tut && mode !== 'sticky' && hubFar()) return `'가운데'가 벌레 동그라미들에서 멀어요. 동그라미들 사이로 내려가 거기서 세로줄을 치면 '가운데'가 그리로 옮겨가요.`;
+  if (tut && mode !== 'sticky' && hubFar()) return `노란 '가운데'가 벌레 동그라미들에서 멀어요. 동그라미들 사이로 내려가, 그 자리에서 뼈대실을 ${frameDeg(hubNode)}갈래 이상 모아 보세요. 지금 가운데만큼 모이면 새로 친 쪽으로 옮겨가요.`;
   if (tut && stats.lays < 4 && mode !== 'sticky'){
     if (sp.lay){
       if (touchUI){ hintMoveFocus = true; return `한 손으로 ${obj('lay')} 누른 채, 다른 손으로 화면 왼쪽 빈 곳을 밀어 걸어가요. 줄기나 땅에 닿으면 손을 떼세요.`; }
@@ -6360,3 +6364,4 @@ if (MANUAL){
 
 </body>
 </html>
+
